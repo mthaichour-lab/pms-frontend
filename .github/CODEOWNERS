@@ -1,0 +1,3 @@
+/src/app/api/ @pms-frontend-owners @pms-security-owners
+/src/lib/auth/ @pms-security-owners
+/src/design-system/ @pms-design-system-owners

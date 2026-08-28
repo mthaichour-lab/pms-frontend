@@ -1,0 +1,8 @@
+image:
+  repository: registry.internal.example/pms/pms-frontend
+  tag: dev
+replicas: 1
+config:
+  nextAuthUrl: https://pms.dev.example
+  keycloakIssuer: https://keycloak.dev.example/realms/pms
+  coreApiUrl: http://pms-backend-api
