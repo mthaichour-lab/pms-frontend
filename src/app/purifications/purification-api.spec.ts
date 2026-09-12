@@ -1,0 +1,8 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { documentCase, getStatement, validCase } from './purification-api';
+afterEach(() => vi.restoreAllMocks());
+describe('purification workflow', () => {
+  it('only accepts a new pending case', () => { const value = { purificationId: crypto.randomUUID(), incomeId: crypto.randomUUID(), poolId: 'POOL-1', businessDate: '2026-09-08', currency: 'DZD', amount: '25', reason: 'Revenu non conforme', status: 'PENDING_DOCUMENTATION', paidAmount: '0' }; expect(validCase(value)).toBe(true); expect(validCase({ ...value, paidAmount: '1' })).toBe(false); });
+  it('encodes statement criteria', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}')); await getStatement('POOL/1', '2026-09-01', '2026-09-30'); expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/core/purifications/statement?poolId=POOL%2F1&from=2026-09-01&to=2026-09-30'); });
+  it('uses idempotency for documentation', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}')); await documentCase('case/1', 'CHARITY', 'SHARIA-1'); expect(fetchMock.mock.calls[0]?.[0]).toContain('case%2F1/document'); expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('idempotency-key')).toMatch(/^[0-9a-f-]{36}$/); });
+});

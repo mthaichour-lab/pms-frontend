@@ -3,3 +3,4 @@ node_modules
 coverage
 .git
 .env*
+pms-backend

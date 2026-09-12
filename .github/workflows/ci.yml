@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  security-events: write
+  id-token: write
 
 jobs:
   validate:
@@ -17,8 +19,108 @@ jobs:
         with:
           node-version: 24
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - name: Initialize CodeQL SAST
+        uses: github/codeql-action/init@fddeee1a7ece751b577e409a89057319e3172939
+        with:
+          languages: javascript-typescript
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
+      - run: pnpm run bff:verify-coverage
+      - run: pnpm run security:verify-page-access
       - run: pnpm run test
+      - name: Analyze source with CodeQL
+        uses: github/codeql-action/analyze@fddeee1a7ece751b577e409a89057319e3172939
       - run: pnpm audit --audit-level high --prod
+      - name: Scan secrets and Docker configuration
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: "true"
       - run: pnpm run build
+      - run: pnpm run deploy:verify
+      - run: pnpm run e2e:smoke
+      - name: Checkout backend integration stack
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: ${{ github.repository_owner }}/pms-backend
+          path: pms-backend
+          token: ${{ secrets.PMS_CROSS_REPO_TOKEN || github.token }}
+      - name: Verify generated SDK provenance
+        env:
+          PMS_BACKEND_CONTEXT: ${{ github.workspace }}/pms-backend
+        run: |
+          pnpm --dir pms-backend install --frozen-lockfile
+          pnpm --dir pms-backend run sdk:pack
+          pnpm run sdk:verify-provenance
+          pnpm run migration:verify-readiness
+      - name: Run authenticated frontend-to-backend integration
+        env:
+          PMS_FRONTEND_CONTEXT: ${{ github.workspace }}
+          NEXTAUTH_SECRET: ci-nextauth-${{ github.run_id }}-at-least-32-characters
+          POSTGRES_PASSWORD: ci-postgres-${{ github.run_id }}
+          RABBITMQ_PASSWORD: ci-rabbitmq-${{ github.run_id }}
+          KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-${{ github.run_id }}
+          KEYCLOAK_DEV_PASSWORD: ci-keycloak-user-${{ github.run_id }}
+        run: |
+          cp pms-backend/.env.local.example pms-backend/.env.local
+          cp pms-backend/.env.compose.example pms-backend/.env.compose
+          printf '\nPOSTGRES_PASSWORD=%s\nRABBITMQ_PASSWORD=%s\nKEYCLOAK_ADMIN_PASSWORD=%s\nKEYCLOAK_DEV_PASSWORD=%s\n' "$POSTGRES_PASSWORD" "$RABBITMQ_PASSWORD" "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DEV_PASSWORD" >> pms-backend/.env.local
+          docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed up --build --abort-on-container-exit --exit-code-from frontend-e2e frontend-e2e
+      - name: Collect full-stack integration logs
+        if: failure()
+        env:
+          PMS_FRONTEND_CONTEXT: ${{ github.workspace }}
+          NEXTAUTH_SECRET: ci-nextauth-${{ github.run_id }}-at-least-32-characters
+        run: |
+          if [ -f pms-backend/.env.local ]; then
+            docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed logs --no-color
+          fi
+      - name: Tear down full-stack integration
+        if: always()
+        env:
+          PMS_FRONTEND_CONTEXT: ${{ github.workspace }}
+          NEXTAUTH_SECRET: ci-nextauth-${{ github.run_id }}-at-least-32-characters
+        run: |
+          if [ -f pms-backend/.env.local ]; then
+            docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed down --volumes --remove-orphans
+          fi
+      - name: Build immutable frontend image
+        run: |
+          mkdir -p build-output
+          docker build --label org.opencontainers.image.revision=${{ github.sha }} --tag pms-frontend:${{ github.sha }} .
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        with:
+          image: pms-frontend:${{ github.sha }}
+          format: spdx-json
+          output-file: build-output/pms-frontend.sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          image-ref: pms-frontend:${{ github.sha }}
+          format: json
+          output: build-output/trivy-image.json
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          hide-progress: "true"
+      - name: Export immutable image artifact
+        run: |
+          docker save pms-frontend:${{ github.sha }} --output build-output/pms-frontend.oci.tar
+          sha256sum build-output/pms-frontend.oci.tar > build-output/pms-frontend.oci.sha256
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+      - name: Sign image artifact with GitHub OIDC
+        run: cosign sign-blob build-output/pms-frontend.oci.tar --bundle build-output/pms-frontend.oci.sigstore.json --yes
+      - name: Upload promoted artifact bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pms-frontend-${{ github.sha }}
+          path: build-output
+          if-no-files-found: error

@@ -1,0 +1,9 @@
+import type { PurificationCase, PurificationStatement } from '@bank/pms-api-client';
+export type { PurificationCase, PurificationStatement };
+const uuid = /^[0-9a-f-]{36}$/i, date = /^\d{4}-\d{2}-\d{2}$/, decimal = /^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/;
+export function validCase(value: PurificationCase): boolean { return uuid.test(value.purificationId) && uuid.test(value.incomeId) && value.poolId.trim().length > 0 && date.test(value.businessDate) && /^[A-Z]{3}$/.test(value.currency) && decimal.test(value.amount) && Number(value.amount) > 0 && value.reason.trim().length > 0 && value.status === 'PENDING_DOCUMENTATION' && value.paidAmount === '0'; }
+async function request<T>(path: string, body?: unknown): Promise<T> { const response = await fetch(`/api/core/purifications${path}`, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(body) }); const payload: unknown = await response.json().catch(() => undefined); if (!response.ok) { const problem = (payload ?? {}) as { detail?: string; title?: string }; throw new Error(problem.detail ?? problem.title ?? `Erreur HTTP ${response.status}`); } return payload as T; }
+export const getStatement = (poolId: string, from: string, to: string) => request<PurificationStatement>(`/statement?${new URLSearchParams({ poolId, from, to })}`);
+export const identifyCase = (value: PurificationCase) => request<PurificationCase>('', value);
+export const documentCase = (id: string, charityBeneficiaryId: string, shariaDecisionReference: string) => request<{ documented: true }>(`/${encodeURIComponent(id)}/document`, { charityBeneficiaryId, shariaDecisionReference });
+export const payCase = (id: string, amount: string, evidenceId: string) => request<{ paid: true }>(`/${encodeURIComponent(id)}/payments`, { amount, evidenceId });

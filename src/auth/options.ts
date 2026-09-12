@@ -19,6 +19,15 @@ function required(name: string, fallback?: string): string {
 
 const issuer = required('OIDC_ISSUER', 'http://localhost:8080/realms/pms-dev');
 const clientSecret = process.env['OIDC_CLIENT_SECRET'];
+export function usesSecureSessionCookie(nextAuthUrl = process.env['NEXTAUTH_URL'] ?? ''): boolean {
+  return nextAuthUrl.startsWith('https://');
+}
+
+export function sessionCookieName(nextAuthUrl = process.env['NEXTAUTH_URL'] ?? ''): string {
+  return usesSecureSessionCookie(nextAuthUrl) ? '__Secure-pms.session-token' : 'pms.session-token';
+}
+
+const secureCookies = usesSecureSessionCookie();
 
 export function assertAuthRuntimeConfiguration(): void {
   if (
@@ -57,12 +66,12 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt', maxAge: 8 * 60 * 60 },
   cookies: {
     sessionToken: {
-      name: '__Secure-pms.session-token',
+      name: sessionCookieName(),
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: true,
+        secure: secureCookies,
       },
     },
   },
@@ -78,4 +87,3 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
-

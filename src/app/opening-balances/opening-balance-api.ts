@@ -1,0 +1,7 @@
+import type { OpeningBalanceCertificationCommand } from '@bank/pms-api-client';
+export type { OpeningBalanceCertificationCommand };
+export type OpeningBalanceLine = OpeningBalanceCertificationCommand['lines'][number];
+const components = ['HISTORICAL_ACCOUNTS', 'PER', 'IRR', 'PAST_DISTRIBUTIONS'] as const;
+export function validCertification(value: OpeningBalanceCertificationCommand): boolean { const found = new Set(value.lines.map((line) => line.component)); return /^[0-9a-f-]{36}$/i.test(value.certificationId) && !Number.isNaN(Date.parse(value.signedAt)) && value.lines.length === 4 && components.every((component) => found.has(component)) && value.lines.every((line) => /^[A-Z]{3}$/.test(line.currencyCode) && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(line.migratedAmount) && line.migratedAmount === line.generalLedgerAmount && line.evidenceReference.trim().length > 0); }
+export async function certify(command: OpeningBalanceCertificationCommand): Promise<{ status: 'CERTIFIED' }> { const response = await fetch('/api/core/accounting/opening-balances/certifications', { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(command) }); const payload: unknown = await response.json().catch(() => undefined); if (!response.ok) { const problem = (payload ?? {}) as { detail?: string; title?: string }; throw new Error(problem.detail ?? problem.title ?? `Erreur HTTP ${response.status}`); } return payload as { status: 'CERTIFIED' }; }
+export { components };

@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { components, validCertification } from './opening-balance-api';
+describe('opening balance certification', () => { it('requires four fully reconciled components', () => { const value = { certificationId: crypto.randomUUID(), signedAt: new Date().toISOString(), lines: components.map((component) => ({ component, currencyCode: 'DZD', migratedAmount: '100', generalLedgerAmount: '100', evidenceReference: `EVIDENCE-${component}` })) }; expect(validCertification(value)).toBe(true); expect(validCertification({ ...value, lines: value.lines.slice(1) })).toBe(false); expect(validCertification({ ...value, lines: value.lines.map((line, index) => index ? line : { ...line, generalLedgerAmount: '99' }) })).toBe(false); }); });

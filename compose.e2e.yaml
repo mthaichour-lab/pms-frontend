@@ -1,0 +1,59 @@
+services:
+  web:
+    image: pms-frontend:e2e
+    build:
+      context: ${PMS_FRONTEND_CONTEXT:?set PMS_FRONTEND_CONTEXT}
+      dockerfile: Dockerfile
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      NEXTAUTH_URL: http://web:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET}
+      OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/pms-dev
+      OIDC_CLIENT_ID: pms-web
+      CORE_API_URL: http://api:3001
+    depends_on:
+      api: { condition: service_healthy }
+      keycloak-bootstrap: { condition: service_completed_successfully }
+      db-seed: { condition: service_completed_successfully }
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=128m,mode=0755
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    networks: [pms]
+
+  frontend-e2e:
+    image: pms-frontend:e2e
+    command: ["node", "tests/e2e/real-bff-integration.mjs"]
+    environment:
+      PMS_WEB_URL: http://web:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET}
+      OIDC_TOKEN_URL: http://keycloak:8080/realms/pms-dev/protocol/openid-connect/token
+      OIDC_CLIENT_ID: pms-e2e
+      OIDC_TEST_USERNAME: ${KEYCLOAK_DEV_USER:-developer}
+      OIDC_TEST_PASSWORD: ${KEYCLOAK_DEV_PASSWORD:?set KEYCLOAK_DEV_PASSWORD}
+    volumes:
+      - ${PMS_FRONTEND_CONTEXT}/tests/e2e/real-bff-integration.mjs:/app/tests/e2e/real-bff-integration.mjs:ro
+    depends_on:
+      web: { condition: service_healthy }
+    read_only: true
+    init: true
+    tmpfs: [/tmp:size=16m, mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [pms]

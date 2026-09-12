@@ -1,0 +1,45 @@
+.page { min-height: 100vh; background: #f4f7f6; color: #172b2a; }
+.header { background: linear-gradient(125deg, #123b39, #17675e); color: white; padding: 2.25rem max(1.25rem, calc((100vw - 1180px) / 2)); }
+.header a { display: inline-block; margin-bottom: .9rem; color: #c9eee6; text-decoration: underline; }
+.header h1 { font-size: clamp(2rem, 4vw, 3.1rem); font-weight: 700; letter-spacing: -.04em; }
+.header p { margin-top: .6rem; max-width: 700px; color: #dcefeb; }
+.main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.tabs button { border: 1px solid #b9cbc7; background: white; padding: .7rem 1rem; border-radius: .6rem; cursor: pointer; font-weight: 650; }
+.tabs button[aria-selected="true"] { background: #17675e; border-color: #17675e; color: white; }
+.grid { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(400px, 1.2fr); gap: 1rem; }
+.card { background: white; border: 1px solid #d9e3e0; border-radius: .85rem; padding: 1.25rem; box-shadow: 0 5px 20px rgba(21, 67, 62, .06); }
+.card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
+.form { display: grid; gap: .9rem; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.field { display: grid; gap: .3rem; font-size: .9rem; font-weight: 600; }
+.field input, .field select, .field textarea { width: 100%; border: 1px solid #9fb5b0; border-radius: .45rem; padding: .68rem .72rem; font: inherit; color: #172b2a; background: white; }
+.field textarea { min-height: 5rem; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus, .tabs button:focus { outline: 3px solid #e9aa39; outline-offset: 2px; }
+.button { background: #17675e; color: white; padding: .72rem 1rem; border-radius: .5rem; font-weight: 700; cursor: pointer; }
+.secondary { background: #e6f0ee; color: #154a45; }
+.button:disabled { opacity: .55; cursor: wait; }
+.notice { border-left: 4px solid #2b8579; background: #eaf6f3; padding: .8rem 1rem; margin-bottom: 1rem; }
+.error { border-left-color: #b52b35; background: #fff0f1; color: #7d1820; }
+.product { display: grid; gap: .65rem; }
+.product dl { display: grid; grid-template-columns: 10rem 1fr; gap: .5rem; }
+.product dt { color: #607470; }
+.product dd { margin: 0; font-weight: 650; }
+.badge { width: fit-content; background: #e9f4dd; color: #365e19; padding: .2rem .55rem; border-radius: 999px; font-size: .8rem; font-weight: 750; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.checksum { word-break: break-all; font-family: ui-monospace, monospace; font-size: .78rem; background: #edf2f1; padding: .55rem; border-radius: .35rem; }
+.hint { color: #5f716e; font-size: .83rem; }
+.separator { border: 0; border-top: 1px solid #d9e3e0; margin: 1.25rem 0; }
+.complianceSteps { display: grid; gap: .6rem; padding: 0; list-style: none; }
+.complianceSteps li { display: flex; align-items: center; gap: .7rem; border: 1px solid #cbd9d6; border-radius: .55rem; padding: .75rem; }
+.complianceSteps li > span:first-child { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: #edf2f1; font-weight: 800; }
+.complianceSteps li > span:last-child { display: grid; gap: .1rem; }
+.complianceSteps small, .referenceList small { color: #607470; }
+.complianceSteps li[data-state="complete"] { border-color: #82ad65; background: #f3f9ed; }
+.complianceSteps li[data-state="blocked"] { border-color: #d6a263; background: #fff8ed; }
+.complianceSummary { margin: 1rem 0; }
+.referenceList { display: grid; gap: .65rem; padding: 0; list-style: none; }
+.referenceList li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .75rem; border-top: 1px solid #e1e9e7; padding-top: .75rem; }
+.referenceList li > div { display: grid; gap: .15rem; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; } .product dl { grid-template-columns: 1fr; gap: .1rem; } }
+@media (prefers-reduced-motion: reduce) { .page, .page::before, .page::after { scroll-behavior: auto !important; } }

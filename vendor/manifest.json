@@ -3,5 +3,6 @@
   "version": "1.0.0",
   "sourceRepository": "pms-backend",
   "sourceContract": "contracts/openapi/pms-api.v1.json",
-  "sha256": "cbde5dfeb29cc86b7d644b87de185481598f09eed9b3d039354f96c5d429cf6d"
+  "artifactSha256": "92dfcb1d6d0f603bdd2a2e45fa3d231737a50f2477de6c1e1cea87a3e7d00e4a",
+  "contractSha256": "fac69dced758e018a779916b56df4e5a1f54e5199a491324cd78ef277f584187"
 }

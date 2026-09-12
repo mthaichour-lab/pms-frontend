@@ -2,6 +2,7 @@ FROM node:24-alpine AS dependencies
 WORKDIR /workspace
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY vendor/bank-pms-api-client-1.0.0.tgz ./vendor/bank-pms-api-client-1.0.0.tgz
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build

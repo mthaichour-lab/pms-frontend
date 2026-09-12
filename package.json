@@ -8,7 +8,15 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy:verify": "node deploy/verification/verify-runtime.mjs",
+    "sdk:verify-provenance": "node vendor/verify-sdk-provenance.mjs",
+    "bff:verify-coverage": "node tests/contracts/verify-bff-operation-coverage.mjs",
+    "security:verify-page-access": "node tests/security/verify-page-access-coverage.mjs",
+    "migration:verify-readiness": "node tests/migration/verify-extraction-readiness.mjs",
+    "e2e:smoke": "node tests/e2e/web-runtime-smoke.mjs",
+    "e2e:real": "docker compose --project-directory ../pms-backend --env-file ../pms-backend/.env.local -f ../pms-backend/compose.yaml -f ../pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed up --build --abort-on-container-exit --exit-code-from frontend-e2e frontend-e2e",
+    "e2e:real:down": "docker compose --project-directory ../pms-backend --env-file ../pms-backend/.env.local -f ../pms-backend/compose.yaml -f ../pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed down --volumes --remove-orphans"
   },
   "dependencies": {
     "@bank/pms-api-client": "file:vendor/bank-pms-api-client-1.0.0.tgz",

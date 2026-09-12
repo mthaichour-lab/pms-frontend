@@ -1,0 +1,10 @@
+services:
+  web:
+    environment:
+      NEXTAUTH_URL: http://localhost:${PMS_WEB_PORT:-3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env.local}
+      OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/pms-dev
+      OIDC_CLIENT_ID: pms-web
+      CORE_API_URL: http://api:3001
+    extra_hosts:
+      - "localhost:host-gateway"
