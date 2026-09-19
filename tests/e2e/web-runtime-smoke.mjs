@@ -20,7 +20,8 @@ try {
 }
 
 async function waitFor(url) {
-  const deadline = Date.now() + 10_000;
+  // Standalone Next startup may exceed 10s on a cold CI runner.
+  const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Next server exited before startup:\n${logs}`);
     try { const response = await fetch(url); if (response.ok) return response; } catch { /* startup race */ }

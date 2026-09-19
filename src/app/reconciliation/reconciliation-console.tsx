@@ -1,21 +1,25 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { reconcile, validReconciliation, type ReconciliationCommand, type ReconciliationResult } from './reconciliation-api';
-import { ReconciliationOperationManager } from './async-operation';
+import { validReconciliation, type ReconciliationCommand, type ReconciliationResult } from './reconciliation-api';
 import { ReconciliationError, ReconciliationStatus } from './reconciliation-feedback';
 import styles from '../products/products.module.css';
 const initial: ReconciliationCommand = { businessDate: new Date().toISOString().slice(0, 10), currency: 'DZD', generalLedgerAmount: '', sourceReference: '', sourceChecksumSha256: '' };
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
+function validResult(value: unknown): value is ReconciliationResult { return isRecord(value) && typeof value.reconciliationId === 'string' && value.reconciliationId.trim().length > 0 && typeof value.state === 'string' && value.state.trim().length > 0 && typeof value.difference === 'string'; }
+export async function reconcileForConsole(command: ReconciliationCommand, signal: AbortSignal): Promise<ReconciliationResult> { const correlationId = crypto.randomUUID(); const response = await fetch('/api/core/accounting/reconciliations', { method: 'POST', signal, headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID(), 'x-correlation-id': correlationId }, body: JSON.stringify(command) }); const payload: unknown = await response.json().catch(() => undefined); const problem = isRecord(payload) ? payload : {}; const detail = typeof problem.detail === 'string' && problem.detail.trim() ? problem.detail : typeof problem.title === 'string' && problem.title.trim() ? problem.title : `Erreur HTTP ${response.status}`; const reference = typeof problem.correlationId === 'string' && problem.correlationId.trim() ? problem.correlationId : response.headers.get('x-correlation-id') ?? correlationId; if (!response.ok) throw new Error(`${detail} (référence : ${reference})`); if (!validResult(payload)) throw new Error(`Réponse de rapprochement invalide. (référence : ${reference})`); return payload; }
+type ReconciliationCallbacks = { loading: () => void; success: (result: ReconciliationResult) => void; failure: (message: string) => void; settled: () => void };
+export class ReconciliationConsoleOperation { private active?: { readonly token: symbol; readonly controller: AbortController }; async run(operation: (signal: AbortSignal) => Promise<ReconciliationResult>, callbacks: ReconciliationCallbacks): Promise<boolean> { if (this.active) return false; const current = { token: Symbol('reconciliation-command'), controller: new AbortController() }; this.active = current; callbacks.loading(); try { const result = await operation(current.controller.signal); if (this.active === current && !current.controller.signal.aborted) callbacks.success(result); } catch (cause) { if (this.active === current && !current.controller.signal.aborted) callbacks.failure(cause instanceof Error ? cause.message : 'Erreur inattendue.'); } finally { if (this.active === current) { this.active = undefined; if (!current.controller.signal.aborted) callbacks.settled(); } } return true; } cancel(): void { this.active?.controller.abort(); this.active = undefined; } }
 export function ReconciliationConsole() {
-  const [command, setCommand] = useState(initial), [submitted, setSubmitted] = useState<ReconciliationCommand>(), [result, setResult] = useState<ReconciliationResult>(), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
-  const operations = useRef<ReconciliationOperationManager>(null);
-  if (!operations.current) operations.current = new ReconciliationOperationManager();
+  const [command, setCommand] = useState(initial), [submitted, setSubmitted] = useState<ReconciliationCommand>(), [result, setResult] = useState<ReconciliationResult>(), [busy, setBusy] = useState(false), [attempted, setAttempted] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const operations = useRef<ReconciliationConsoleOperation>(null);
+  if (!operations.current) operations.current = new ReconciliationConsoleOperation();
   useEffect(() => () => operations.current?.cancel(), []);
   const change = (key: keyof ReconciliationCommand, value: string) => setCommand({ ...command, [key]: value });
   async function submit(event: FormEvent) {
-    event.preventDefault();
+    event.preventDefault(); setAttempted(true);
     if (!validReconciliation(command)) return setError('Vérifiez la date, la devise, le montant, la référence et le checksum SHA-256.');
     const snapshot = { ...command };
-    await operations.current!.run(() => reconcile(snapshot), {
+    await operations.current!.run((signal) => reconcileForConsole(snapshot, signal), {
       loading: () => { setBusy(true); setError(''); setMessage(''); setResult(undefined); setSubmitted(undefined); },
       success: (reconciled) => { setResult(reconciled); setSubmitted(snapshot); setMessage(`Rapprochement ${reconciled.state}.`); },
       failure: setError,

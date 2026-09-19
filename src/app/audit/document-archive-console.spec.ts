@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ArchiveError, ArchiveOperationManager } from './document-archive-console';
 
 const noop = () => undefined;
@@ -68,6 +68,19 @@ describe('document archive interactions', () => {
     await manager.run(async () => { throw new Error('Paperless indisponible'); }, { loading: noop, success: noop, failure: (message) => failures.push(message), settled: () => { settled += 1; } });
     expect(failures).toEqual(['Paperless indisponible']);
     expect(settled).toBe(1);
+  });
+
+  it('aborts an active archive request and suppresses late callbacks', async () => {
+    const pending = deferred<string>();
+    const manager = new ArchiveOperationManager();
+    let signal: AbortSignal | undefined;
+    const success = vi.fn();
+    const running = manager.run((received) => { signal = received; return pending.promise; }, { loading: noop, success, failure: noop, settled: noop });
+    manager.cancel();
+    expect(signal?.aborted).toBe(true);
+    pending.resolve('late');
+    await running;
+    expect(success).not.toHaveBeenCalled();
   });
 
   it('renders errors as an assertive accessible alert', () => {

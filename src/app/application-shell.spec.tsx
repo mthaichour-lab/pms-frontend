@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import { ApplicationShell } from './application-shell';
 
-function render(roles: readonly string[] = ['FINANCE_CONTROLLER']): string {
+function render(roles: readonly string[] = ['FINANCE_CONTROLLER'], locale: 'fr' | 'ar' | 'en' = 'fr'): string {
   return renderToStaticMarkup(createElement(ApplicationShell, {
-    userName: 'Nadia Benali', roles, locale: 'fr',
+    userName: 'Nadia Benali', roles, locale,
   }));
 }
 
@@ -30,5 +30,13 @@ describe('application shell navigation', () => {
     expect(html).toContain('href="/customers"');
     expect(html).not.toContain('href="/audit"');
     expect(html).not.toContain('href="/risk"');
+  });
+
+  it('renders the selected locale direction and RTL flow arrow', () => {
+    const html = render(['FINANCE_CONTROLLER'], 'ar');
+    expect(html).toContain('lang="ar"');
+    expect(html).toContain('dir="rtl"');
+    expect(html).toContain('id="application-locale"');
+    expect(html).toContain('←');
   });
 });

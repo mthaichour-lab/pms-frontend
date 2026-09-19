@@ -111,7 +111,7 @@ export function AuditTrailView({ trail, error, busy, limit, filters, onFiltersCh
   const recentEvents = trail ? [...trail.events].reverse() : [];
 
   return <div className={styles.grid}>
-    <section className={styles.card}>
+    <section className={styles.card} aria-busy={busy}>
       <h2>Intégrité du journal</h2>
       <form className={styles.form} onSubmit={onApplyFilters} aria-label="Filtres du journal d’audit">
         <div className={styles.row}>
@@ -146,7 +146,7 @@ export function AuditTrailView({ trail, error, busy, limit, filters, onFiltersCh
       </div>}
     </section>
 
-    <section className={styles.card}>
+    <section className={styles.card} aria-busy={busy}>
       <h2>Lecture de la chaîne</h2>
       <p className={styles.hint}>Chaque empreinte d’événement scelle son contenu et référence l’empreinte précédente.</p>
       {trail && <dl className={styles.product}>
@@ -155,7 +155,7 @@ export function AuditTrailView({ trail, error, busy, limit, filters, onFiltersCh
       </dl>}
     </section>
 
-    <section className={styles.card} style={{ gridColumn: '1 / -1' }}>
+    <section className={styles.card} style={{ gridColumn: '1 / -1' }} aria-busy={busy}>
       <h2>Événements récents</h2>
       {!trail && !error && <p className={styles.hint}>Chargement du segment d’audit…</p>}
       {trail?.events.length === 0 && <p className={styles.hint}>Aucun événement d’audit dans ce segment.</p>}

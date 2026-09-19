@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createExport, getAuditTrail, validateAuditTrailFilters } from './audit-api';
+import { ExportOperationManager } from './audit-console';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -36,5 +37,34 @@ describe('audit trail', () => {
   it('surfaces the API problem detail', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ detail: 'Accès au journal refusé' }), { status: 403 }));
     await expect(getAuditTrail()).rejects.toThrow('Accès au journal refusé');
+  });
+});
+
+describe('secure export console operations', () => {
+  it('aborts on unmount and suppresses stale callbacks', async () => {
+    let signal!: AbortSignal;
+    let resolve!: (value: string) => void;
+    const pending = new Promise<string>((done) => { resolve = done; });
+    const manager = new ExportOperationManager();
+    const callbacks = { loading: vi.fn(), success: vi.fn(), failure: vi.fn(), settled: vi.fn() };
+    const operation = manager.run((requestSignal) => { signal = requestSignal; return pending; }, callbacks);
+    manager.unmount();
+    resolve('export');
+    await operation;
+    expect(signal.aborted).toBe(true);
+    expect(callbacks.loading).toHaveBeenCalledOnce();
+    expect(callbacks.success).not.toHaveBeenCalled();
+    expect(callbacks.failure).not.toHaveBeenCalled();
+    expect(callbacks.settled).not.toHaveBeenCalled();
+  });
+
+  it('allows a remounted manager to run a fresh operation', async () => {
+    const manager = new ExportOperationManager();
+    const callbacks = { loading: vi.fn(), success: vi.fn(), failure: vi.fn(), settled: vi.fn() };
+    manager.unmount();
+    manager.mount();
+    await expect(manager.run(async () => 'export', callbacks)).resolves.toBe(true);
+    expect(callbacks.success).toHaveBeenCalledWith('export');
+    expect(callbacks.settled).toHaveBeenCalledOnce();
   });
 });

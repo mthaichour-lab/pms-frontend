@@ -29,6 +29,7 @@ export function productReferencesRequest<T>(productId: string, path = '', init?:
 
 export function referenceValidationMessage(command: CreateProductReferenceCommand): string | undefined {
   if (!command.referenceId.trim()) return 'L’identifiant de référence est obligatoire.';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.referenceId.trim())) return 'L’identifiant de référence doit être un UUID valide.';
   return undefined;
 }
 
@@ -54,9 +55,20 @@ export async function productRequest<T>(path: string, init?: RequestInit): Promi
   return body as T;
 }
 
+export const validProductId = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+export const validProductJustification = (value: string) => value.trim().length >= 10 && value.length <= 1000;
+export const validProductCode = (value: string) => /^[A-Z0-9_-]{2,32}$/.test(value);
+export const validProductName = (value: string) => value.trim().length >= 3 && value.trim().length <= 160;
+
+const percentageMillionths = (value: string): bigint | undefined => {
+  if (!/^(?:0|[1-9]\d{0,2})(?:\.\d{1,6})?$/.test(value)) return undefined;
+  const [whole = '', fraction = ''] = value.split('.');
+  const result = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+  return result <= 100_000_000n ? result : undefined;
+};
+
 export function isExactNisba(investor: string, bank: string): boolean {
-  const investorValue = Number(investor);
-  const bankValue = Number(bank);
-  return Number.isFinite(investorValue) && Number.isFinite(bankValue) &&
-    investorValue >= 0 && bankValue >= 0 && Math.abs(investorValue + bankValue - 100) < 0.000001;
+  const investorValue = percentageMillionths(investor);
+  const bankValue = percentageMillionths(bank);
+  return investorValue !== undefined && bankValue !== undefined && investorValue + bankValue === 100_000_000n;
 }

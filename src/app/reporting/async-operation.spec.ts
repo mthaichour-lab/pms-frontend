@@ -20,12 +20,21 @@ describe('reporting command coordination', () => {
   it('ignores a command response invalidated on unmount', async () => {
     const pending = deferred<string>();
     const values: string[] = [];
+    let signal: AbortSignal | undefined;
     const manager = new ExclusiveOperationManager();
-    const run = manager.run(() => pending.promise, { loading: noop, success: (value) => values.push(value), failure: noop, settled: noop });
+    const run = manager.run((currentSignal) => { signal = currentSignal; return pending.promise; }, { loading: noop, success: (value) => values.push(value), failure: noop, settled: noop });
     manager.cancel();
+    expect(signal?.aborted).toBe(true);
     pending.resolve('obsolete');
     await run;
     expect(values).toEqual([]);
+  });
+
+  it('releases the exclusive slot after a command settles', async () => {
+    const manager = new ExclusiveOperationManager();
+    expect(manager.isActive()).toBe(false);
+    await manager.run(async () => 'created', { loading: noop, success: noop, failure: noop, settled: noop });
+    expect(manager.isActive()).toBe(false);
   });
 });
 

@@ -6,7 +6,7 @@ const command = { objectKey: 'landing/audit/proof.pdf', businessType: 'AUDIT_EVI
 describe('document archive API', () => {
   it('rejects unsafe landing paths before submission', () => { expect(validDocumentArchiveRequest(command)).toBe(true); expect(validDocumentArchiveRequest({ ...command, objectKey: 'landing/../secret' })).toBe(false); });
   it('queues idempotently then reads the archive status', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ requestId: '00000000-0000-4000-8000-000000000001', status: 'QUEUED' }))).mockResolvedValueOnce(new Response(JSON.stringify({ requestId: '00000000-0000-4000-8000-000000000001', status: 'ARCHIVED' })));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ requestId: '00000000-0000-4000-8000-000000000001', status: 'QUEUED' }))).mockResolvedValueOnce(new Response(JSON.stringify({ requestId: '00000000-0000-4000-8000-000000000001', status: 'ARCHIVED', objectKey: command.objectKey, businessType: command.businessType, businessId: command.businessId, classification: command.classification, evidentiary: true, createdAt: '2026-09-19T00:00:00.000Z' })));
     await requestDocumentArchive(command);
     await getDocumentArchiveRequest('00000000-0000-4000-8000-000000000001');
     expect(new Headers(fetchMock.mock.calls[0]![1]?.headers).get('idempotency-key')).toMatch(/^[0-9a-f-]{36}$/);

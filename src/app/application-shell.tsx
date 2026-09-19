@@ -25,7 +25,7 @@ const heights = [
 export function ApplicationShell({ userName, roles, locale }: Props) {
   const [open, setOpen] = useState(false),
     [dashboard, setDashboard] = useState<AudienceDashboard>(),
-    [dashboardState, setDashboardState] = useState<"loading" | "certified" | "demo">("loading"),
+    [dashboardState, setDashboardState] = useState<"loading" | "certified" | "demo" | "error">("loading"),
     t = getMessages(locale),
     displayName = userName || t.userFallback,
     role = roles[0]?.replaceAll("_", " ") ?? t.userRole,
@@ -93,15 +93,15 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
   })) ?? kpis;
   const dashboardDetail = dashboardState === "certified" && dashboard
     ? `Situation au ${dashboard.businessDate ?? dashboard.generatedAt.slice(0, 10)} · ${Math.round(dashboard.queryDurationMs)} ms`
-    : dashboardState === "demo" ? `${t.consolidatedAt} · mode démonstration` : "Chargement des indicateurs certifiés…";
+    : dashboardState === "demo" ? `${t.consolidatedAt} · mode démonstration` : dashboardState === "error" ? "Indicateurs certifiés indisponibles. Vérifiez la connectivité puis réessayez." : "Chargement des indicateurs certifiés…";
   useEffect(() => {
     const audience = audienceForRoles(roles);
     if (!audience) { setDashboardState("demo"); return; }
-    let active = true;
-    loadAudienceDashboard(audience)
-      .then((result) => { if (active) { setDashboard(result); setDashboardState("certified"); } })
-      .catch(() => { if (active) setDashboardState("demo"); });
-    return () => { active = false; };
+    const controller = new AbortController();
+    loadAudienceDashboard(audience, undefined, { signal: controller.signal })
+      .then((result) => { if (!controller.signal.aborted) { setDashboard(result); setDashboardState("certified"); } })
+      .catch(() => { if (!controller.signal.aborted) setDashboardState("error"); });
+    return () => { controller.abort(); };
   }, [roles]);
   useEffect(() => {
     if (!open) return;
@@ -125,11 +125,14 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
   }, [open]);
   function changeLocale(value: string) {
     if (!supportedLocales.some((candidate) => candidate === value)) return;
-    document.cookie = localeCookie(value as Locale);
+    const nextLocale = value as Locale;
+    document.cookie = localeCookie(nextLocale);
+    document.documentElement.lang = nextLocale;
+    document.documentElement.dir = directionFor(nextLocale);
     window.location.reload();
   }
   return (
-    <div className={`${styles.shell} ${shell.shell}`}>
+    <div className={`${styles.shell} ${shell.shell}`} lang={locale} dir={directionFor(locale)}>
       <a className={styles.skip} href="#main-content">
         {t.skip}
       </a>
@@ -205,6 +208,8 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
           <label className={`${styles.language} ${shell.language}`}>
             {t.language}
             <select
+              id="application-locale"
+              aria-label={t.language}
               value={locale}
               onChange={(e) => changeLocale(e.target.value)}
             >
@@ -310,7 +315,7 @@ function SectionTitle({ title, detail }: { title: string; detail: string }) {
   return (
     <div className={styles.sectionHead}>
       <h2>{title}</h2>
-      <p>{detail}</p>
+    <p aria-live="polite" aria-atomic="true" role="status">{detail}</p>
     </div>
   );
 }

@@ -2,13 +2,65 @@
 import { type FormEvent, useState } from 'react';
 import { documentCase, getStatement, identifyCase, payCase, validCase, type PurificationCase, type PurificationStatement } from './purification-api';
 import styles from '../products/products.module.css';
+
 const today = new Date().toISOString().slice(0, 10);
+
 export function PurificationConsole() {
-  const [poolId, setPoolId] = useState(''), [from, setFrom] = useState(today.slice(0, 8) + '01'), [to, setTo] = useState(today), [incomeId, setIncomeId] = useState(''), [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [selected, setSelected] = useState(''), [beneficiary, setBeneficiary] = useState(''), [decision, setDecision] = useState(''), [payment, setPayment] = useState(''), [evidence, setEvidence] = useState(''), [statement, setStatement] = useState<PurificationStatement>(), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
-  async function run<T>(work: () => Promise<T>, done: (value: T) => void, success: string) { setBusy(true); setMessage(''); try { done(await work()); setMessage(success); } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Erreur inattendue.'); } finally { setBusy(false); } }
-  async function load(event?: FormEvent) { event?.preventDefault(); if (!poolId || from > to) return setMessage('Pool et période valide requis.'); await run(() => getStatement(poolId, from, to), setStatement, 'Relevé actualisé.'); }
-  function identify() { const item: PurificationCase = { purificationId: crypto.randomUUID(), incomeId, poolId, businessDate: to, currency: 'DZD', amount, reason, status: 'PENDING_DOCUMENTATION', paidAmount: '0' }; if (!validCase(item)) return setMessage('Cas invalide : revenu UUID, pool, montant et motif requis.'); void run(() => identifyCase(item), () => { setSelected(item.purificationId); void load(); }, 'Cas identifié.'); }
-  function document() { if (!selected || !beneficiary.trim() || !decision.trim()) return setMessage('Sélectionnez un cas et renseignez bénéficiaire et décision.'); void run(() => documentCase(selected, beneficiary, decision), () => void load(), 'Documentation Charia enregistrée.'); }
-  function pay() { if (!selected || Number(payment) <= 0 || !evidence.trim()) return setMessage('Montant positif et preuve de paiement requis.'); void run(() => payCase(selected, payment, evidence), () => void load(), 'Paiement enregistré.'); }
-  return <div className={styles.grid}><section className={styles.card}><h2>Relevé de purification</h2><form className={styles.form} onSubmit={(event) => void load(event)}><label className={styles.field}>Pool<input value={poolId} onChange={(event) => setPoolId(event.target.value)} /></label><div className={styles.row}><label className={styles.field}>Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className={styles.field}>Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div><button className={styles.button} disabled={busy}>Actualiser</button></form>{statement && <dl className={styles.product}><dt>Report initial</dt><dd>{statement.openingCarry}</dd><dt>Identifié</dt><dd>{statement.identified}</dd><dt>Payé</dt><dd>{statement.paid}</dd><dt>Solde à purifier</dt><dd>{statement.closingBalance}</dd></dl>}{message && <p className={styles.notice}>{message}</p>}</section><section className={styles.card}><h2>Identifier un revenu non conforme</h2><div className={styles.form}><label className={styles.field}>Revenu (UUID)<input value={incomeId} onChange={(event) => setIncomeId(event.target.value)} /></label><label className={styles.field}>Montant DZD<input value={amount} onChange={(event) => setAmount(event.target.value)} /></label><label className={styles.field}>Motif<textarea value={reason} onChange={(event) => setReason(event.target.value)} /></label><button className={styles.button} disabled={busy} onClick={identify}>Identifier</button></div></section><section className={styles.card} style={{ gridColumn: '1 / -1' }}><h2>Documenter puis payer</h2><div className={styles.form}><label className={styles.field}>Cas<select value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Sélectionner</option>{statement?.cases.map((item) => <option key={item.purificationId} value={item.purificationId}>{item.reason} · {item.amount} {item.currency} · {item.status}</option>)}</select></label><div className={styles.row}><label className={styles.field}>Bénéficiaire caritatif<input value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></label><label className={styles.field}>Décision Charia<input value={decision} onChange={(event) => setDecision(event.target.value)} /></label></div><button className={styles.button} disabled={busy || !selected} onClick={document}>Documenter</button><div className={styles.row}><label className={styles.field}>Montant payé<input value={payment} onChange={(event) => setPayment(event.target.value)} /></label><label className={styles.field}>Preuve de paiement<input value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label></div><button className={styles.button} disabled={busy || !selected} onClick={pay}>Enregistrer le paiement</button></div></section></div>;
+  const [poolId, setPoolId] = useState('');
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`);
+  const [to, setTo] = useState(today);
+  const [incomeId, setIncomeId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [selected, setSelected] = useState('');
+  const [beneficiary, setBeneficiary] = useState('');
+  const [decision, setDecision] = useState('');
+  const [payment, setPayment] = useState('');
+  const [evidence, setEvidence] = useState('');
+  const [statement, setStatement] = useState<PurificationStatement>();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function run<T>(work: () => Promise<T>, done: (value: T) => void, success: string) {
+    setBusy(true); setMessage('');
+    try { done(await work()); setMessage(success); }
+    catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Erreur inattendue.'); }
+    finally { setBusy(false); }
+  }
+  async function load(event?: FormEvent) {
+    event?.preventDefault();
+    if (!poolId || from > to) { setMessage('Pool et période valide requis.'); return; }
+    await run(() => getStatement(poolId, from, to), setStatement, 'Relevé actualisé.');
+  }
+  function identify() {
+    const item: PurificationCase = { purificationId: crypto.randomUUID(), incomeId, poolId, businessDate: to, currency: 'DZD', amount, reason, status: 'PENDING_DOCUMENTATION', paidAmount: '0' };
+    if (!validCase(item)) { setMessage('Cas invalide : revenu UUID, pool, montant et motif requis.'); return; }
+    void run(() => identifyCase(item), () => { setSelected(item.purificationId); void load(); }, 'Cas identifié.');
+  }
+  function document() {
+    if (!selected || !beneficiary.trim() || !decision.trim()) { setMessage('Sélectionnez un cas et renseignez bénéficiaire et décision.'); return; }
+    void run(() => documentCase(selected, beneficiary, decision), () => void load(), 'Documentation Charia enregistrée.');
+  }
+  function pay() {
+    if (!selected || Number(payment) <= 0 || !evidence.trim()) { setMessage('Montant positif et preuve de paiement requis.'); return; }
+    void run(() => payCase(selected, payment, evidence), () => void load(), 'Paiement enregistré.');
+  }
+
+  return <div className={styles.grid} aria-busy={busy}>
+    <section className={styles.card}><h2>Relevé de purification</h2><form className={styles.form} onSubmit={(event) => void load(event)}>
+      <label className={styles.field}>Pool<input value={poolId} onChange={(event) => setPoolId(event.target.value)} /></label>
+      <div className={styles.row}><label className={styles.field}>Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className={styles.field}>Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div>
+      <button className={styles.button} disabled={busy}>Actualiser</button></form>
+      {statement && <dl className={styles.product}><dt>Report initial</dt><dd>{statement.openingCarry}</dd><dt>Identifié</dt><dd>{statement.identified}</dd><dt>Payé</dt><dd>{statement.paid}</dd><dt>Solde à purifier</dt><dd>{statement.closingBalance}</dd></dl>}
+      {message && <p className={styles.notice} role="status" aria-live="polite">{message}</p>}
+    </section>
+    <section className={styles.card}><h2>Identifier un revenu non conforme</h2><div className={styles.form}>
+      <label className={styles.field}>Revenu (UUID)<input value={incomeId} onChange={(event) => setIncomeId(event.target.value)} /></label><label className={styles.field}>Montant DZD<input value={amount} onChange={(event) => setAmount(event.target.value)} /></label><label className={styles.field}>Motif<textarea value={reason} onChange={(event) => setReason(event.target.value)} /></label><button className={styles.button} disabled={busy} onClick={identify}>Identifier</button>
+    </div></section>
+    <section className={styles.card} style={{ gridColumn: '1 / -1' }}><h2>Documenter puis payer</h2><div className={styles.form}>
+      <label className={styles.field}>Cas<select value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Sélectionner</option>{statement?.cases.map((item) => <option key={item.purificationId} value={item.purificationId}>{item.reason} · {item.amount} {item.currency} · {item.status}</option>)}</select></label>
+      <div className={styles.row}><label className={styles.field}>Bénéficiaire caritatif<input value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></label><label className={styles.field}>Décision Charia<input value={decision} onChange={(event) => setDecision(event.target.value)} /></label></div><button className={styles.button} disabled={busy || !selected} onClick={document}>Documenter</button>
+      <div className={styles.row}><label className={styles.field}>Montant payé<input value={payment} onChange={(event) => setPayment(event.target.value)} /></label><label className={styles.field}>Preuve de paiement<input value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label></div><button className={styles.button} disabled={busy || !selected} onClick={pay}>Enregistrer le paiement</button>
+    </div></section>
+  </div>;
 }

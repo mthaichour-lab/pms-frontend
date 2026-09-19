@@ -2,6 +2,8 @@ import type { CalculationRun, ProfitExplanation, WorkflowTransition } from "@ban
 export type { CalculationRun, ProfitExplanation, WorkflowTransition };
 export const validJustification = (value: string) =>
   value.trim().length >= 10 && value.length <= 1000;
+export const validCalculationRunId = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export const validExplanationIdentifiers = (runId: string, accountId: string) => {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuid.test(runId) && uuid.test(accountId);

@@ -42,6 +42,22 @@ describe("latest calculation reads", () => {
 });
 
 describe("exclusive calculation transitions", () => {
+  it("keeps read and transition coordinators independent for parallel work", async () => {
+    const read = new LatestOperationManager();
+    const transition = new ExclusiveOperationManager();
+    const readPending = deferred<string>();
+    const transitionPending = deferred<string>();
+    const values: string[] = [];
+    const callbacks = { loading: noop, success: (value: string) => values.push(value), failure: noop, settled: noop };
+    const readRun = read.run(() => readPending.promise, callbacks);
+    const transitionRun = transition.run(() => transitionPending.promise, callbacks);
+    expect(transition.isActive()).toBe(true);
+    readPending.resolve("read-complete");
+    transitionPending.resolve("transition-complete");
+    await Promise.all([readRun, transitionRun]);
+    expect(values).toEqual(["read-complete", "transition-complete"]);
+  });
+
   it("prevents a duplicate Maker/Checker submission", async () => {
     const pending = deferred<string>();
     let requests = 0;
@@ -54,6 +70,32 @@ describe("exclusive calculation transitions", () => {
     expect(requests).toBe(1);
     pending.resolve("approved");
     await first;
+    expect(manager.isActive()).toBe(false);
+  });
+
+  it("aborts an active transition and suppresses its late callbacks", async () => {
+    const pending = deferred<string>();
+    const manager = new ExclusiveOperationManager();
+    const values: string[] = [];
+    let settled = 0;
+    let signal: AbortSignal | undefined;
+    const operation = manager.run((operationSignal) => {
+      signal = operationSignal;
+      return pending.promise;
+    }, {
+      loading: noop,
+      success: (value) => values.push(value),
+      failure: noop,
+      settled: () => { settled += 1; },
+    });
+
+    manager.cancel();
+    expect(signal?.aborted).toBe(true);
+    pending.resolve("stale");
+    await operation;
+
+    expect(values).toEqual([]);
+    expect(settled).toBe(0);
     expect(manager.isActive()).toBe(false);
   });
 });

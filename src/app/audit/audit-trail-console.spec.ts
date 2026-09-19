@@ -87,6 +87,14 @@ describe('audit trail console', () => {
     expect(html).toContain('Accès au journal refusé');
   });
 
+  it('marks audit sections busy while loading', () => {
+    const html = renderToStaticMarkup(createElement(AuditTrailView, {
+      trail: undefined, error: '', busy: true, limit: 50, filters: {},
+      onFiltersChange: noop, onApplyFilters: noop, onResetFilters: noop, onLimitChange: noop, onRefresh: noop,
+    }));
+    expect(html).toContain('aria-busy="true"');
+  });
+
   it('renders the selected limit and tolerates an invalid occurrence date', () => {
     const html = render({ events: [event('invalid-date', 'not-a-date')], integrity: 'HASH_CHAIN', chainValid: true, verifiedCount: 1 }, '', 100);
     expect(html).toContain('<option value="100" selected="">100 événements</option>');
@@ -171,5 +179,16 @@ describe('audit trail console', () => {
 
     expect(requestedLimits).toEqual([50, 200]);
     expect(failures).toEqual([]);
+  });
+
+  it('suppresses callbacks after cancellation/unmount', async () => {
+    const pending = deferred<AuditTrail>();
+    const manager = new AuditTrailRequestManager(() => pending.promise);
+    const success = () => { throw new Error('stale success callback'); };
+    const failure = () => { throw new Error('stale failure callback'); };
+    const running = manager.load(50, {}, { loading: noop, success, failure, settled: () => { throw new Error('stale settled callback'); } });
+    manager.cancel();
+    pending.resolve({ events: [], integrity: 'HASH_CHAIN', chainValid: true, verifiedCount: 0 });
+    await running;
   });
 });

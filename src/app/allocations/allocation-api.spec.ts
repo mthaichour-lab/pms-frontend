@@ -1,27 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAllocationHistory, getAssetAnomalies, poolRequest, transitionPool, validAllocation } from './allocation-api';
+import { allocationFieldValidity, getAllocationHistory, getAssetAnomalies, poolRequest, recordAllocation, simulateAllocation, transitionPool, validAllocation, validIsoDate, validPercentage, validPoolId } from './allocation-api';
+
 afterEach(() => vi.restoreAllMocks());
+const allocation = { allocationId: '17146c36-a0cb-4e0a-b095-60b67c945eb9', assetId: 'a1d817e4-657f-475f-a96a-7eecb8f93acc', percentage: '75.123456', effectiveFrom: '2026-09-08', justification: 'Mandat confirmé' };
+
 describe('allocation rules', () => {
-  it('accepts a complete allocation within capacity bounds', () => { expect(validAllocation({ assetId: 'asset-1', percentage: '75', effectiveFrom: '2026-09-08', justification: 'Mandat confirmé' })).toBe(true); });
-  it('rejects invalid percentages and short evidence', () => { expect(validAllocation({ assetId: 'asset-1', percentage: '101', effectiveFrom: '2026-09-08', justification: 'court' })).toBe(false); });
+  it('accepts a complete allocation within exact capacity bounds', () => { expect(validAllocation(allocation)).toBe(true); expect(validPercentage('100.000000')).toBe(true); });
+  it.each(['100.000001', '1e2', '01', '0', '-1', '1.0000001'])('rejects the non-canonical percentage %s', (percentage) => { expect(validPercentage(percentage)).toBe(false); });
+  it('rejects impossible calendar dates', () => { expect(validIsoDate('2026-02-29')).toBe(false); expect(validIsoDate('2028-02-29')).toBe(true); });
+  it('reports field-level evidence and identifier failures', () => { const validity = allocationFieldValidity({ ...allocation, assetId: 'asset-1', justification: 'court', approvalId: 'not-a-uuid' }); expect(validity).toMatchObject({ assetId: false, justification: false, approvalId: false }); });
+  it('validates the backend pool identifier contract', () => { expect(validPoolId('POOL_DZD')).toBe(true); expect(validPoolId('pool-dzd')).toBe(false); });
 });
 
-describe('asset quality', () => {
-  it('loads anomalies through the BFF', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'));
-    await getAssetAnomalies('asset/1');
-    expect(fetchMock.mock.calls[0]![0]).toBe('/api/core/investment-pools/assets/asset%2F1/anomalies');
-  });
-});
-
-describe('allocation history', () => {
-  it('encodes the asset and as-of date', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'));
-    await getAllocationHistory('asset/1', '2026-09-08');
-    expect(fetchMock.mock.calls[0]![0]).toBe('/api/core/investment-pools/assets/asset%2F1/allocations?asOf=2026-09-08');
-  });
-});
-describe('poolRequest', () => {
-  it('adds command idempotency headers', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ allocationId: 'allocation-1' }))); await poolRequest('pool-1', '/allocations/simulate', { assetId: 'asset-1' }); const [, init] = fetchMock.mock.calls[0]!; expect(new Headers(init?.headers).get('idempotency-key')).toMatch(/^[0-9a-f-]{36}$/); });
+describe('allocation requests', () => {
+  it('encodes asset history and propagates cancellation and correlation', async () => { const controller = new AbortController(); const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]')); await getAllocationHistory('asset/1', '2026-09-08', { signal: controller.signal, correlationId: 'corr-history' }); const [url, init] = fetchMock.mock.calls[0]!; expect(url).toBe('/api/core/investment-pools/assets/asset%2F1/allocations?asOf=2026-09-08'); expect(init?.signal).toBe(controller.signal); expect(new Headers(init?.headers).get('x-correlation-id')).toBe('corr-history'); });
+  it('loads anomalies through the BFF', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]')); await getAssetAnomalies('asset/1'); expect(fetchMock.mock.calls[0]![0]).toBe('/api/core/investment-pools/assets/asset%2F1/anomalies'); });
+  it('keeps the simulation result separate from the allocation command', async () => { const result = { remainingPercentage: '10.000000', currentAllocatedPercentage: '70.000000', simulated: true, blockingAnomalies: [], approvalRequired: false, executable: true }; const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(result))); await expect(simulateAllocation('POOL_DZD', allocation)).resolves.toEqual(result); const [url, init] = fetchMock.mock.calls[0]!; expect(url).toBe('/api/core/investment-pools/POOL_DZD/allocations/simulate'); expect(init?.body).toBe(JSON.stringify(allocation)); });
+  it('records the original command with caller-stable idempotency and correlation keys', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ allocation, remainingPercentage: '25.000000', status: 'CREATED' }))); await recordAllocation('POOL_DZD', allocation, { idempotencyKey: 'idem-allocation', correlationId: 'corr-allocation' }); const [, init] = fetchMock.mock.calls[0]!; const headers = new Headers(init?.headers); expect(init?.body).toBe(JSON.stringify(allocation)); expect(headers.get('idempotency-key')).toBe('idem-allocation'); expect(headers.get('x-correlation-id')).toBe('corr-allocation'); });
   it('routes pool lifecycle actions as idempotent commands', async () => { const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'ACTIVE' }))); await transitionPool('POOL_DZD', 'activate'); expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/core/investment-pools/POOL_DZD/activate'); expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('idempotency-key')).toBeTruthy(); });
+  it('surfaces body and header correlation references', async () => { vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Capacité dépassée', correlationId: 'corr-body' }), { status: 409 })).mockResolvedValueOnce(new Response(null, { status: 503, headers: { 'x-correlation-id': 'corr-header' } })); await expect(poolRequest('POOL_DZD')).rejects.toThrow('Capacité dépassée (référence : corr-body)'); await expect(poolRequest('POOL_DZD')).rejects.toThrow('Erreur HTTP 503 (référence : corr-header)'); });
+  it('rejects malformed successful workflow payloads', async () => { vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ simulated: true }))).mockResolvedValueOnce(new Response(JSON.stringify({ status: 'CREATED' }))); await expect(simulateAllocation('POOL_DZD', allocation, { correlationId: 'corr-sim' })).rejects.toThrow('Réponse de simulation invalide. (référence : corr-sim)'); await expect(recordAllocation('POOL_DZD', allocation, { correlationId: 'corr-save' })).rejects.toThrow('Réponse d’allocation invalide. (référence : corr-save)'); });
 });
