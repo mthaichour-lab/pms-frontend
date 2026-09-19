@@ -8,7 +8,7 @@
 .filters { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto; gap: 8px; align-items: end; padding: 12px; background: var(--surface); border: 1px solid var(--line); }
 .filters label { display: grid; gap: 5px; color: var(--gray-300); font-size: .72rem; font-weight: 600; }
 .filters input, .filters select { min-height: 38px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-4); background: var(--surface2); color: var(--ink); }
-.filters button, .feedback button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--primary-border); border-radius: var(--radius-4); background: var(--primary); color: white; font-weight: 650; cursor: pointer; transition: background-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
+.filters button, .feedback button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--primary-border); border-radius: var(--radius-4); background: var(--primary); color: var(--on-accent); font-weight: 650; cursor: pointer; transition: background-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
 .filters button:hover, .feedback button:hover { background: var(--primary-hover); }
 .filters button:active, .feedback button:active { transform: translateY(1px); }
 .summary { display: grid; grid-template-columns: repeat(4, 1fr); margin: 10px 0; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }

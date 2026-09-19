@@ -2,7 +2,7 @@
 .header { background: var(--surface); border-bottom: 1px solid var(--line); border-inline-start: 2px solid var(--primary); padding: 18px max(18px, calc((100vw - 96rem) / 2)); }
 .header a { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--primary-text); font-size: .72rem; transition: color var(--dur-fast) var(--ease-snappy); }
 .header a::before { content: "←"; font-family: "JetBrains Mono", Consolas, monospace; }
-.header a:hover { color: white; }
+.header a:hover { color: var(--ink); }
 .header h1 { font-size: clamp(1.25rem, 2vw, 1.7rem); font-weight: 650; line-height: 1.1; letter-spacing: -.035em; }
 .header p { margin-top: 6px; max-width: 70ch; color: var(--muted); font-size: .68rem; }
 .main { max-width: 96rem; margin: 0 auto; padding: 14px 18px 40px; }
@@ -24,11 +24,11 @@
 .field input:hover, .field select:hover, .field textarea:hover { border-color: var(--gray-500); }
 .field input:focus, .field select:focus, .field textarea:focus, .tabs button:focus { border-color: var(--primary); outline: 2px solid rgb(59 130 246 / 24%); outline-offset: 1px; }
 .field input[aria-invalid="true"], .field select[aria-invalid="true"], .field textarea[aria-invalid="true"] { border-color: var(--negative); }
-.button { min-height: 34px; background: var(--primary); color: var(--gray-950); padding: 7px 11px; border: 1px solid var(--primary-border); border-radius: var(--radius-2); font-weight: 650; font-size: .68rem; cursor: pointer; box-shadow: none; transition: background-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
+.button { min-height: 34px; background: var(--primary); color: var(--on-accent); padding: 7px 11px; border: 1px solid var(--primary-border); border-radius: var(--radius-2); font-weight: 650; font-size: .68rem; cursor: pointer; box-shadow: none; transition: background-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
 .button:hover { background: var(--primary-hover); }
 .button:active { transform: translateY(1px); }
 .secondary { background: var(--surface2); border-color: var(--line-strong); color: var(--gray-300); }
-.secondary:hover { background: var(--surface3); color: white; }
+.secondary:hover { background: var(--surface3); color: var(--ink); }
 .button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
 .notice { border-inline-start: 3px solid var(--secondary); background: var(--secondary-soft); border-radius: var(--radius-4); padding: 9px 11px; margin-bottom: 10px; color: var(--secondary-text); font-size: .76rem; }
 .error { border-inline-start-color: var(--negative); background: var(--negative-soft); color: var(--negative-text); }

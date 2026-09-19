@@ -12,6 +12,8 @@
   --tertiary: #b8a16e; --tertiary-soft: #2d2718; --tertiary-border: #5c5030; --quaternary: #8a709d;
   --positive: #6fa493; --positiveSoft: #10271f; --positive-border: #31594c;
   --negative: #a95f60; --negative-soft: #2d1718; --negative-text: #d89899;
+  --on-accent: #020705; --topbar: rgb(2 7 5 / 94%); --overlay: rgb(2 7 5 / 82%);
+  --brand-mark-bg: #d8dfdc; --brand-mark-ink: #020705;
   --shadow-sm: 0 1px 2px rgb(2 8 23 / 32%); --shadow-md: 0 10px 28px rgb(2 8 23 / 24%);
   --shadow: var(--shadow-sm);
   --radius-2: 2px; --radius-4: 4px; --radius-6: 6px; --radius-8: 8px;
@@ -22,6 +24,23 @@
   --ease-spring: cubic-bezier(.2, 1.4, .4, 1);
   --dur-fast: .12s; --dur-med: .22s; --dur-slow: .4s;
   font-family: "JetBrains Mono", "IBM Plex Mono", Consolas, monospace; font-size: 13px; font-synthesis: none;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --gray-950: #eef2ed; --gray-900: #f8faf7; --gray-850: #f1f4f0;
+  --gray-800: #e4eae5; --gray-700: #c5d0c9; --gray-500: #708179;
+  --gray-400: #566a61; --gray-300: #33483f; --gray-100: #13231c;
+  --canvas: #eef2ed; --surface: #fbfcfa; --surface2: #f1f5f1; --surface3: #e5ebe6;
+  --ink: #13231c; --muted: #62756c; --line: #d4ddd6; --line-strong: #b9c8be; --navy: #e6ece7;
+  --primary: #3f7769; --primary-hover: #315f54; --primary-soft: #dcebe5;
+  --primary-border: #6c9d90; --primary-text: #285b4e; --primary-active-border: #91b5aa; --primary-active-text: #1e4b40;
+  --secondary: #347466; --secondary-soft: #e0eee9; --secondary-text: #265c50; --secondary-bright: #28695a;
+  --tertiary: #8a6e2f; --tertiary-soft: #f2ead8; --tertiary-border: #c5ad78; --quaternary: #735987;
+  --positive: #347661; --positiveSoft: #e0eee7; --positive-border: #9bc0b1;
+  --negative: #a34f52; --negative-soft: #f7e7e7; --negative-text: #873b3e;
+  --on-accent: #f8faf7; --topbar: rgb(251 252 250 / 94%); --overlay: rgb(19 35 28 / 50%);
+  --brand-mark-bg: #183229; --brand-mark-ink: #f8faf7;
+  --shadow-sm: 0 1px 2px rgb(44 66 56 / 10%); --shadow-md: 0 10px 28px rgb(44 66 56 / 12%);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; background: var(--canvas); }
@@ -35,7 +54,7 @@ button { border: 0; }
 input, select, textarea { color-scheme: dark; }
 strong, b { font-weight: 650; }
 table, .tabular { font-variant-numeric: tabular-nums; }
-::selection { background: var(--primary); color: white; }
+::selection { background: var(--primary); color: var(--on-accent); }
 :focus-visible { outline: 2px solid var(--secondary); outline-offset: 2px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--canvas); }
@@ -45,6 +64,11 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 [dir="rtl"] aside + button + div, [dir="rtl"] aside + div { margin-left: 0 !important; margin-right: 15.5rem; }
 .language { display: flex; align-items: center; gap: var(--space-2); color: var(--muted); font-size: .75rem; }
 .language select { border: 1px solid var(--line); border-radius: var(--radius-4); background: var(--surface2); padding: 6px 8px; }
+.theme-toggle { position: fixed; inset-inline-end: 14px; bottom: 14px; z-index: 60; display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: var(--radius-4); background: color-mix(in srgb, var(--surface) 94%, transparent); color: var(--ink); box-shadow: var(--shadow-md); backdrop-filter: blur(10px); cursor: pointer; font-size: .61rem; transition: background-color var(--dur-fast) var(--ease-snappy), border-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
+.theme-toggle:hover { background: var(--surface2); border-color: var(--primary-border); }
+.theme-toggle:active { transform: translateY(1px); }
+.theme-toggle__indicator { position: relative; width: 14px; height: 14px; border: 1px solid var(--primary); border-radius: 50%; background: linear-gradient(90deg, var(--primary) 50%, transparent 50%); transform: rotate(-24deg); transition: transform var(--dur-med) var(--ease-spring); }
+:root[data-theme="light"] .theme-toggle__indicator { transform: rotate(156deg); }
 @media (max-width: 760px) {
   [dir="rtl"] aside + button + div, [dir="rtl"] aside + div { margin-right: 0 !important; }
   .language { font-size: 0; } .language select { font-size: .75rem; }
