@@ -1,17 +1,17 @@
 :root {
   color-scheme: dark;
-  --gray-950: #080c13; --gray-900: #0f1623; --gray-850: #151e2d;
-  --gray-800: #1d2939; --gray-700: #334155; --gray-500: #64748b;
-  --gray-400: #94a3b8; --gray-300: #cbd5e1; --gray-100: #f1f5f9;
+  --gray-950: #020705; --gray-900: #07100d; --gray-850: #0b1512;
+  --gray-800: #111e1a; --gray-700: #22332d; --gray-500: #53665f;
+  --gray-400: #778981; --gray-300: #a7b4af; --gray-100: #d8dfdc;
   --canvas: var(--gray-950); --surface: var(--gray-900); --surface2: var(--gray-850);
   --surface3: var(--gray-800); --ink: var(--gray-100); --muted: var(--gray-400);
-  --line: #263449; --line-strong: #3a4b63; --navy: #0b111c;
-  --primary: #3b82f6; --primary-hover: #2563eb; --primary-soft: #142d55;
-  --primary-border: #60a5fa; --primary-text: #93c5fd; --primary-active-border: #275799; --primary-active-text: #bfdbfe;
-  --secondary: #14b8a6; --secondary-soft: #0d3535; --secondary-text: #99f6e4; --secondary-bright: #5eead4;
-  --tertiary: #f59e0b; --tertiary-soft: #3c2b0d; --tertiary-border: #6b4d13; --quaternary: #ec4899;
-  --positive: #34d399; --positiveSoft: #0c352c; --positive-border: #145846;
-  --negative: #fb7185; --negative-soft: #3b1721; --negative-text: #fda4af;
+  --line: #17251f; --line-strong: #2a3c35; --navy: #020906;
+  --primary: #648f83; --primary-hover: #79a699; --primary-soft: #152823;
+  --primary-border: #476d62; --primary-text: #8cb6aa; --primary-active-border: #35584e; --primary-active-text: #acd0c6;
+  --secondary: #447f70; --secondary-soft: #10251f; --secondary-text: #8fbcae; --secondary-bright: #79ae9e;
+  --tertiary: #b8a16e; --tertiary-soft: #2d2718; --tertiary-border: #5c5030; --quaternary: #8a709d;
+  --positive: #6fa493; --positiveSoft: #10271f; --positive-border: #31594c;
+  --negative: #a95f60; --negative-soft: #2d1718; --negative-text: #d89899;
   --shadow-sm: 0 1px 2px rgb(2 8 23 / 32%); --shadow-md: 0 10px 28px rgb(2 8 23 / 24%);
   --shadow: var(--shadow-sm);
   --radius-2: 2px; --radius-4: 4px; --radius-6: 6px; --radius-8: 8px;
@@ -21,7 +21,7 @@
   --ease-snappy: cubic-bezier(.2, .8, .2, 1); --ease-smooth: cubic-bezier(.4, 0, .2, 1);
   --ease-spring: cubic-bezier(.2, 1.4, .4, 1);
   --dur-fast: .12s; --dur-med: .22s; --dur-slow: .4s;
-  font-family: Inter, "Segoe UI", Arial, sans-serif; font-size: 14px; font-synthesis: none;
+  font-family: "JetBrains Mono", "IBM Plex Mono", Consolas, monospace; font-size: 13px; font-synthesis: none;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; background: var(--canvas); }

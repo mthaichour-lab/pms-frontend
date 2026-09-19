@@ -22,6 +22,12 @@ const heights = [
   [82, 69],
   [91, 76],
 ];
+const metricShapes = [
+  [34, 62, 48, 74, 56, 82, 67],
+  [76, 48, 64, 42, 58, 35, 52],
+  [28, 41, 36, 55, 63, 79, 91],
+  [42, 58, 39, 72, 51, 68, 60],
+];
 export function ApplicationShell({ userName, roles, locale }: Props) {
   const [open, setOpen] = useState(false),
     [dashboard, setDashboard] = useState<AudienceDashboard>(),
@@ -253,7 +259,7 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
           </section>
           <SectionTitle title={t.keyIndicators} detail={dashboardDetail} />
           <section className={styles.kpis} aria-label={t.keyIndicators}>
-            {displayedKpis.map((k) => (
+            {displayedKpis.map((k, metricIndex) => (
               <article className={styles.card} key={k.label}>
                 <span className={styles.kpiLabel}>{k.label}</span>
                 <strong className={styles.kpiValue}>{k.value}</strong>
@@ -261,6 +267,11 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
                   className={`${styles.delta} ${k.warning ? styles.warning : ""}`}
                 >
                   {k.detail}
+                </span>
+                <span className={styles.metricSparkline} aria-hidden>
+                  {metricShapes[metricIndex % metricShapes.length].map((height, index) => (
+                    <i key={index} style={{ height: `${height}%` }} />
+                  ))}
                 </span>
               </article>
             ))}
