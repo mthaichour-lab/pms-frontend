@@ -9,16 +9,16 @@
 
 .content {
   margin-left: 0;
-  margin-inline-start: 17rem;
+  margin-inline-start: 15.5rem;
 }
 
 .group {
-  color: #aeb9ca;
+  color: var(--gray-500);
 }
 
 .link {
-  min-height: 2.75rem;
-  transition: background-color 180ms ease, color 180ms ease;
+  min-height: 2.375rem;
+  transition: background-color var(--dur-fast) var(--ease-snappy), color var(--dur-fast) var(--ease-snappy);
 }
 
 .link:active {
@@ -39,14 +39,14 @@
 }
 
 .language select {
-  min-height: 2.25rem;
+  min-height: 2.375rem;
   max-width: 8rem;
 }
 
 @media (max-width: 760px) {
   .sidebar {
     visibility: hidden;
-    transition: transform 200ms ease, visibility 0s 200ms;
+    transition: transform var(--dur-med) var(--ease-smooth), visibility 0s var(--dur-med);
   }
 
   .sidebar.open {
