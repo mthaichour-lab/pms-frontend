@@ -29,6 +29,31 @@ export function sessionCookieName(nextAuthUrl = process.env['NEXTAUTH_URL'] ?? '
 
 const secureCookies = usesSecureSessionCookie();
 
+function groupsFromJwt(jwt: string | undefined): unknown {
+  if (!jwt) return undefined;
+
+  const payload = jwt.split('.')[1];
+  if (!payload) return undefined;
+
+  try {
+    return (JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { groups?: unknown }).groups;
+  } catch {
+    return undefined;
+  }
+}
+
+export function rolesFromOidcTokens(
+  accessToken?: string,
+  idToken?: string,
+): PmsRole[] {
+  return [
+    ...new Set([
+      ...mapGroupsToRoles(groupsFromJwt(accessToken)),
+      ...mapGroupsToRoles(groupsFromJwt(idToken)),
+    ]),
+  ].sort() as PmsRole[];
+}
+
 export function assertAuthRuntimeConfiguration(): void {
   if (
     process.env['NODE_ENV'] === 'production' &&
@@ -78,7 +103,17 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, user }) {
       if (account?.access_token) token.accessToken = account.access_token;
-      if (user && 'roles' in user) token.roles = user.roles as PmsRole[];
+      const tokenRoles = rolesFromOidcTokens(
+        account?.access_token ?? (typeof token.accessToken === 'string' ? token.accessToken : undefined),
+        account?.id_token,
+      );
+      if (account || user || tokenRoles.length > 0) {
+        const profileRoles = user && 'roles' in user && Array.isArray(user.roles)
+          ? user.roles as PmsRole[]
+          : [];
+        const existingRoles = Array.isArray(token.roles) ? token.roles as PmsRole[] : [];
+        token.roles = [...new Set([...existingRoles, ...profileRoles, ...tokenRoles])].sort();
+      }
       return token;
     },
     async session({ session, token }) {

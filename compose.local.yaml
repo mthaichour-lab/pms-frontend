@@ -5,6 +5,10 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env.local}
       OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/pms-dev
       OIDC_CLIENT_ID: pms-web
+      # pms-web is a public PKCE client. Override the production placeholder
+      # inherited from .env.compose so NextAuth does not authenticate it as a
+      # confidential client at the token endpoint.
+      OIDC_CLIENT_SECRET: ""
       CORE_API_URL: http://api:3001
     extra_hosts:
       - "localhost:host-gateway"

@@ -1,7 +1,7 @@
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { sessionCookieName } from '@/auth/options';
+import { rolesFromOidcTokens, sessionCookieName } from '@/auth/options';
 import { canAccessNavigationRoute, isManagedNavigationRoute } from '@/auth/navigation-access';
 
 export async function proxy(request: NextRequest) {
@@ -17,7 +17,9 @@ export async function proxy(request: NextRequest) {
     signIn.searchParams.set('callbackUrl', request.url);
     return NextResponse.redirect(signIn);
   }
-  const roles = Array.isArray(token.roles) ? token.roles : [];
+  const roles = Array.isArray(token.roles) && token.roles.length > 0
+    ? token.roles
+    : rolesFromOidcTokens(typeof token.accessToken === 'string' ? token.accessToken : undefined);
   if (!canAccessNavigationRoute(path, roles)) return NextResponse.redirect(new URL('/forbidden', request.url));
   return NextResponse.next();
 }
