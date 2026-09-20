@@ -59,6 +59,15 @@ interface RouteContext {
   params: Promise<{ path: string[] }>;
 }
 
+type CatalogKind = 'products' | 'customers' | 'investment-pools';
+
+type CatalogEntry = {
+  id: string;
+  label: string;
+  detail: string;
+  status: string;
+};
+
 async function authenticatedClient(request: NextRequest) {
   const sessionSecret = process.env['NEXTAUTH_SECRET'];
   if (!sessionSecret && process.env['NODE_ENV'] === 'production') {
@@ -77,6 +86,45 @@ async function authenticatedClient(request: NextRequest) {
   });
 }
 
+async function authenticatedCatalog(request: NextRequest, kind: CatalogKind, correlationId: string): Promise<Response | undefined> {
+  const sessionSecret = process.env['NEXTAUTH_SECRET'];
+  if (!sessionSecret && process.env['NODE_ENV'] === 'production') throw new Error('NEXTAUTH_SECRET is required in production');
+  const token = await getToken({
+    req: request,
+    secret: sessionSecret ?? 'local-development-secret-change-me',
+    cookieName: sessionCookieName(),
+  });
+  if (typeof token?.accessToken !== 'string') return undefined;
+  const baseUrl = process.env['CORE_API_URL'] ?? 'http://localhost:3001';
+  return fetch(`${baseUrl}/${kind}?limit=50&offset=0`, {
+    cache: 'no-store',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${token.accessToken}`,
+      'x-correlation-id': correlationId,
+    },
+  });
+}
+
+function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
+  const items = typeof payload === 'object' && payload !== null && Array.isArray((payload as { items?: unknown }).items)
+    ? (payload as { items: unknown[] }).items : [];
+  return items.flatMap((item): CatalogEntry[] => {
+    if (!item || typeof item !== 'object') return [];
+    const value = item as Record<string, unknown>;
+    if (kind === 'products' && typeof value.productId === 'string' && typeof value.code === 'string' && typeof value.name === 'string' && typeof value.status === 'string') {
+      return [{ id: value.productId, label: value.code, detail: value.name, status: value.status }];
+    }
+    if (kind === 'customers' && typeof value.customerId === 'string' && typeof value.segment === 'string' && typeof value.kycStatus === 'string') {
+      return [{ id: value.customerId, label: `Client ${value.customerId.slice(0, 8)}`, detail: `${value.segment} · KYC ${value.kycStatus}`, status: value.kycStatus }];
+    }
+    if (kind === 'investment-pools' && typeof value.poolId === 'string' && typeof value.displayName === 'string' && typeof value.currency === 'string' && typeof value.status === 'string') {
+      return [{ id: value.poolId, label: value.poolId, detail: `${value.displayName} · ${value.currency}`, status: value.status }];
+    }
+    return [];
+  });
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestCorrelationId = correlationId(request);
   const client = await authenticatedClient(request);
@@ -88,6 +136,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       correlationId: requestCorrelationId,
       traceparent: request.headers.get('traceparent') ?? undefined,
     };
+    if (path.length === 1 && (path[0] === 'products' || path[0] === 'customers' || path[0] === 'investment-pools')) {
+      const kind = path[0] as CatalogKind;
+      const response = await authenticatedCatalog(request, kind, requestCorrelationId);
+      if (!response) return problem(401, 'Unauthenticated', requestCorrelationId);
+      const payload: unknown = await response.json().catch(() => undefined);
+      if (!response.ok) return NextResponse.json(payload ?? { type: 'about:blank', title: 'Backend unavailable', status: response.status }, {
+        status: response.status,
+        headers: { 'content-type': 'application/problem+json', 'x-correlation-id': requestCorrelationId },
+      });
+      return correlatedJson({ items: catalogEntries(kind, payload) }, requestCorrelationId);
+    }
     if (path.length === 2 && path[0] === 'audit' && path[1] === 'events') {
       const parameters = request.nextUrl.searchParams;
       const requestedLimit = parameters.get('limit');

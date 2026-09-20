@@ -5,6 +5,7 @@ import { ExclusiveProductOperation, LatestProductRead } from './async-operation'
 import type { InvestmentProduct, ProductTerms, ProductTermsSimulation } from './product-api';
 import { isExactNisba, validProductCode, validProductId, validProductJustification, validProductName } from './product-api';
 import { ProductReferencesPanel } from './product-references-panel';
+import { EntityCatalog } from '../entity-catalog';
 import styles from './products.module.css';
 
 type Tab = 'product' | 'terms' | 'references';
@@ -160,6 +161,7 @@ export function ProductsConsole() {
   const actions = productActionsForStatus(product?.status);
 
   return <>
+    <EntityCatalog kind="products" selectedId={productId} disabled={busy} onSelect={changeProductId} />
     <div className={styles.tabs} role="tablist" aria-label="Gestion des produits">
       <button id="product-tab" type="button" role="tab" aria-controls="product-panel" aria-selected={tab === 'product'} tabIndex={tab === 'product' ? 0 : -1} onKeyDown={moveTab} onClick={() => setTab('product')}>Produits</button>
       <button id="terms-tab" type="button" role="tab" aria-controls="terms-panel" aria-selected={tab === 'terms'} tabIndex={tab === 'terms' ? 0 : -1} onKeyDown={moveTab} onClick={() => setTab('terms')}>Versions et simulation</button>

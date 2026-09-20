@@ -1,12 +1,13 @@
-.page { min-height: 100dvh; background: var(--canvas); color: var(--ink); }
-.header { padding: 18px max(18px, calc((100vw - 96rem) / 2)); background: var(--surface); border-bottom: 1px solid var(--line); border-inline-start: 2px solid var(--secondary); }
+.page { min-height: calc(100dvh - 7.75rem); min-width: 0; max-width: 100%; overflow-x: clip; background: var(--canvas); color: var(--ink); }
+.header { padding: 1.8rem clamp(1rem, 2.1vw, 2.25rem) 1.5rem; background: radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 34%), var(--canvas); border-bottom: 1px solid var(--line); }
 .header a { display: inline-flex; margin-bottom: 16px; color: var(--primary-text); font-size: .72rem; }
 .header p { margin: 0 0 4px; color: var(--secondary); font-size: .65rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
-.header h1 { font-size: clamp(1.25rem, 2vw, 1.7rem); line-height: 1.1; letter-spacing: -.035em; }
+.header h1 { font-size: clamp(1.9rem, 2.9vw, 2.75rem); line-height: 1.05; letter-spacing: -.05em; }
 .header span { display: block; margin-top: 8px; color: var(--muted); max-width: 65ch; }
-.page main { max-width: 96rem; margin: auto; padding: 14px 18px; }
-.filters { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto; gap: 8px; align-items: end; padding: 12px; background: var(--surface); border: 1px solid var(--line); }
-.filters label { display: grid; gap: 5px; color: var(--gray-300); font-size: .72rem; font-weight: 600; }
+.page main { width: min(100%, 104rem); min-width: 0; max-width: 100%; margin: 0; padding: 1.4rem clamp(1rem, 2.1vw, 2.25rem) 3rem; }
+.filters { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto; gap: 8px; align-items: end; min-width: 0; max-width: 100%; padding: 12px; background: var(--surface); border: 1px solid var(--line); }
+.filters > *, .summary > * { min-width: 0; }
+.filters label { display: grid; gap: 5px; min-width: 0; color: var(--gray-300); font-size: .72rem; font-weight: 600; }
 .filters input, .filters select { min-height: 38px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-4); background: var(--surface2); color: var(--ink); }
 .filters button, .feedback button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--primary-border); border-radius: var(--radius-4); background: var(--primary); color: var(--on-accent); font-weight: 650; cursor: pointer; transition: background-color var(--dur-fast) var(--ease-snappy), transform var(--dur-fast) var(--ease-snappy); }
 .filters button:hover, .feedback button:hover { background: var(--primary-hover); }
@@ -37,7 +38,7 @@
 .skeleton i { height: 48px; border-radius: var(--radius-4); background: linear-gradient(90deg, var(--surface2), var(--surface3), var(--surface2)); background-size: 200% 100%; animation: pulse 1.2s var(--ease-smooth) infinite; }
 @keyframes pulse { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }
-@media (max-width: 720px) {
+@media (max-width: 1024px) {
   .filters { grid-template-columns: 1fr; } .summary { grid-template-columns: repeat(2, 1fr); }
   .page main { padding: 12px; } .header { padding: 20px; }
 }

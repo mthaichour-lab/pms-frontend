@@ -39,4 +39,12 @@ describe('application shell navigation', () => {
     expect(html).toContain('id="application-locale"');
     expect(html).toContain('←');
   });
+
+  it('exposes an accessible monthly/annual chart selector', () => {
+    const html = render();
+    expect(html).toContain('role="group" aria-label="Période du graphique"');
+    expect(html).toContain('aria-pressed="true">Mensuel');
+    expect(html).toContain('aria-pressed="false">Annuel');
+    expect(html).toContain('vue mensuelle');
+  });
 });

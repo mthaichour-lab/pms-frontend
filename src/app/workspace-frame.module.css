@@ -1,0 +1,6 @@
+.routeContent { min-width: 0; max-width: 100%; overflow-x: clip; }
+.demoBar { display: flex; align-items: center; gap: 1.15rem; min-height: 2.5rem; padding: .45rem clamp(1rem, 2vw, 2rem); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--primary) 7%, var(--surface)); color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+.demoBar span { display: inline-flex; align-items: center; gap: .5rem; margin-inline-end: auto; color: var(--positive); font-weight: 650; }
+.demoBar i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--positive); box-shadow: 0 0 0 .22rem color-mix(in srgb, var(--positive) 14%, transparent); }
+.demoBar b { color: var(--ink); font-weight: 600; }
+@media (max-width: 760px) { .demoBar { overflow-x: auto; gap: .9rem; white-space: nowrap; scrollbar-width: none; } .demoBar::-webkit-scrollbar { display: none; } }

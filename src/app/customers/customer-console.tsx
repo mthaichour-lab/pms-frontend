@@ -2,6 +2,7 @@
 import { FormEvent, useEffect, useRef, useState, type ReactNode } from 'react';
 import { type CustomerProfile, type LegalRestriction } from './customer-api';
 import styles from '../products/products.module.css';
+import { EntityCatalog } from '../entity-catalog';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const token = /^tok_[A-Za-z0-9_-]{16,128}$/;
@@ -158,7 +159,7 @@ export function CustomerConsole() {
     await run((signal) => customerRequest(`/${encodeURIComponent(customerId)}/restrictions/${encodeURIComponent(restrictionId)}/lift`, { liftedAt }, isCustomerProfile, signal), 'Restriction levée.');
   }
 
-  return <div className={styles.grid} aria-busy={busy}>
+  return <><EntityCatalog kind="customers" selectedId={draft.customerId} disabled={busy} onSelect={(customerId) => changeDraft('customerId', customerId)} /><div className={styles.grid} aria-busy={busy}>
     <section className={styles.card} aria-labelledby="customer-profile-title">
       <h2 id="customer-profile-title">Profil client tokenisé</h2>
       <form className={styles.form} onSubmit={lookup} noValidate>
@@ -183,5 +184,5 @@ export function CustomerConsole() {
         </div>
       </> : <p className={styles.hint}>Chargez ou créez un profil avant d’appliquer une restriction.</p>}
     </section>
-  </div>;
+  </div></>;
 }
