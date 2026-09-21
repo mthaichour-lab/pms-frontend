@@ -10,6 +10,7 @@ import styles from './products.module.css';
 
 type Tab = 'product' | 'terms' | 'references';
 export type ProductAction = 'validate' | 'publish' | 'suspend' | 'resume' | 'close';
+const productActionLabels: Record<ProductAction, string> = { validate: 'Valider', publish: 'Publier', suspend: 'Suspendre', resume: 'Réactiver', close: 'Supprimer / archiver' };
 
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 export async function productRequestForConsole<T>(path: string, init: RequestInit, validate: (value: unknown) => value is T): Promise<T> {
@@ -70,8 +71,11 @@ export function ProductsConsole() {
 
   async function lookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await loadProduct(productId.trim());
+  }
+
+  async function loadProduct(requestedId: string) {
     if (commands.current!.isActive()) return;
-    const requestedId = productId.trim();
     if (!validProductId(requestedId)) { setProduct(undefined); setError('L’identifiant du produit doit être un UUID valide.'); return; }
     await reads.current!.run(
       (signal) => productRequestForConsole(`/${encodeURIComponent(requestedId)}`, { signal }, isProductPayload),
@@ -91,6 +95,11 @@ export function ProductsConsole() {
     setBusy(commands.current!.isActive());
     setError('');
     setMessage('');
+  }
+
+  function selectProduct(productId: string) {
+    changeProductId(productId);
+    void loadProduct(productId);
   }
 
   async function create(event: FormEvent<HTMLFormElement>) {
@@ -161,7 +170,7 @@ export function ProductsConsole() {
   const actions = productActionsForStatus(product?.status);
 
   return <>
-    <EntityCatalog kind="products" selectedId={productId} disabled={busy} onSelect={changeProductId} />
+    <EntityCatalog kind="products" selectedId={productId} disabled={busy} onSelect={selectProduct} />
     <div className={styles.tabs} role="tablist" aria-label="Gestion des produits">
       <button id="product-tab" type="button" role="tab" aria-controls="product-panel" aria-selected={tab === 'product'} tabIndex={tab === 'product' ? 0 : -1} onKeyDown={moveTab} onClick={() => setTab('product')}>Produits</button>
       <button id="terms-tab" type="button" role="tab" aria-controls="terms-panel" aria-selected={tab === 'terms'} tabIndex={tab === 'terms' ? 0 : -1} onKeyDown={moveTab} onClick={() => setTab('terms')}>Versions et simulation</button>
@@ -177,7 +186,7 @@ export function ProductsConsole() {
         <button className={styles.button} disabled={busy}>{busy ? 'Traitement…' : 'Créer le brouillon'}</button>
       </form></section>
       <section className={styles.card} aria-labelledby="consult-title"><h2 id="consult-title">Consulter et piloter</h2><form className={styles.form} onSubmit={lookup} noValidate><label className={styles.field}>Identifiant du produit<input value={productId} onChange={(event) => changeProductId(event.target.value)} required disabled={commands.current.isActive()} aria-invalid={Boolean(productId) && !validProductId(productId)} aria-describedby="product-id-hint" /></label><p id="product-id-hint" className={styles.hint}>Identifiant UUID du produit.</p><button className={`${styles.button} ${styles.secondary}`} disabled={busy}>Rechercher</button></form>
-        {product ? <article className={styles.product} aria-label={`Produit ${product.code}`}><span className={styles.badge}>{product.status}</span><dl><dt>Identifiant</dt><dd className={styles.checksum}>{product.productId}</dd><dt>Code</dt><dd>{product.code}</dd><dt>Libellé</dt><dd>{product.name}</dd><dt>Part investisseur</dt><dd>{product.investorNisba} %</dd><dt>Part banque</dt><dd>{product.bankNisba} %</dd><dt>Référence Charia</dt><dd>{product.shariaReference ?? 'Non renseignée'}</dd></dl>{actions.length > 0 ? <form className={styles.form} onSubmit={transition}><label className={styles.field}>Justification de la transition<textarea value={justification} disabled={busy} onChange={(event) => setJustification(event.target.value)} minLength={10} maxLength={1000} required aria-invalid={Boolean(justification) && !validProductJustification(justification)} aria-describedby="product-transition-hint" /></label><p id="product-transition-hint" className={styles.hint}>{justification.trim().length} / 1 000 caractères · minimum 10.</p><div className={styles.actions}>{actions.map((action) => <button type="submit" name="action" value={action} className={`${styles.button} ${styles.secondary}`} key={action} disabled={busy}>{action}</button>)}</div></form> : <p className={styles.hint}>Aucune transition disponible pour cet état.</p>}</article> : null}
+        {product ? <article className={styles.product} aria-label={`Produit ${product.code}`}><span className={styles.badge}>{product.status}</span><dl><dt>Identifiant</dt><dd className={styles.checksum}>{product.productId}</dd><dt>Code</dt><dd>{product.code}</dd><dt>Libellé</dt><dd>{product.name}</dd><dt>Part investisseur</dt><dd>{product.investorNisba} %</dd><dt>Part banque</dt><dd>{product.bankNisba} %</dd><dt>Référence Charia</dt><dd>{product.shariaReference ?? 'Non renseignée'}</dd></dl>{actions.length > 0 ? <form className={styles.form} onSubmit={transition}><label className={styles.field}>Justification de la transition<textarea value={justification} disabled={busy} onChange={(event) => setJustification(event.target.value)} minLength={10} maxLength={1000} required aria-invalid={Boolean(justification) && !validProductJustification(justification)} aria-describedby="product-transition-hint" /></label><p id="product-transition-hint" className={styles.hint}>{justification.trim().length} / 1 000 caractères · minimum 10.</p><div className={styles.actions}>{actions.map((action) => <button type="submit" name="action" value={action} className={`${styles.button} ${styles.secondary}`} key={action} disabled={busy}>{productActionLabels[action]}</button>)}</div></form> : <p className={styles.hint}>Aucune transition disponible pour cet état.</p>}</article> : null}
       </section>
     </div> : tab === 'terms' ? <div id="terms-panel" role="tabpanel" aria-labelledby="terms-tab"><TermsPanel key={product?.productId ?? productId} busy={busy} defaultProductId={product?.productId ?? productId} simulation={simulation} terms={terms} onSubmit={termsOperation} onPublish={publishTerms} /></div> : <div id="references-panel" role="tabpanel" aria-labelledby="references-tab"><ProductReferencesPanel defaultProductId={product?.productId ?? productId} /></div>}
   </>;

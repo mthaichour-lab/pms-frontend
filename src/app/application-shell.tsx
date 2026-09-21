@@ -63,6 +63,7 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
     { label: t.restitution, items: [
       { label: t.reporting, icon: "report" as const, href: "/reporting" },
       { label: t.audit, icon: "audit" as const, href: "/audit" },
+      { label: "Utilisateurs et rôles", icon: "users" as const, href: "/users" },
     ] },
   ];
   const visibleNavGroups = useMemo(() => {

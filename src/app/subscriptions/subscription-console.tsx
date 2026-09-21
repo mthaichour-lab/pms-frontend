@@ -7,6 +7,14 @@ import {
   type InvestmentSubscriptionAction,
 } from './subscription-api';
 import styles from '../products/products.module.css';
+import { EntityCatalog } from '../entity-catalog';
+import type { ProductTerms } from '../products/product-api';
+
+export function publishedSubscriptionTerms(value: unknown, businessDate: string): readonly ProductTerms[] {
+  const rows = Array.isArray(value) ? value : isRecord(value) && Array.isArray(value.items) ? value.items : undefined;
+  if (!rows) throw new Error('Réponse des conditions contractuelles invalide.');
+  return rows.filter((item): item is ProductTerms => isRecord(item) && typeof item.termsVersionId === 'string' && UUID.test(item.termsVersionId) && typeof item.version === 'number' && typeof item.effectiveFrom === 'string' && item.effectiveFrom <= businessDate && (item.effectiveTo === undefined || typeof item.effectiveTo === 'string' && item.effectiveTo >= businessDate) && item.status === 'PUBLISHED' && typeof item.investorNisba === 'string' && typeof item.bankNisba === 'string').sort((a, b) => b.version - a.version);
+}
 
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const canonicalAmount = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
@@ -157,10 +165,32 @@ export function SubscriptionConsole() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [productTerms, setProductTerms] = useState<readonly ProductTerms[]>([]);
+  const [termsLoading, setTermsLoading] = useState(false);
+  const [termsError, setTermsError] = useState('');
   const [draftAttempted, setDraftAttempted] = useState(false);
   const [actionAttempted, setActionAttempted] = useState(false);
   const operations = useRef(new SubscriptionOperationCoordinator());
   useEffect(() => { operations.current.mount(); return () => operations.current.unmount(); }, []);
+  useEffect(() => { setDraft((current) => current.accountId ? current : { ...current, accountId: crypto.randomUUID() }); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setProductTerms([]); setTermsError('');
+    if (!UUID.test(draft.productId)) { setTermsLoading(false); return () => controller.abort(); }
+    setTermsLoading(true);
+    void fetch(`/api/core/products/${encodeURIComponent(draft.productId)}/terms`, { signal: controller.signal, cache: 'no-store' }).then(async (response) => {
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error(isRecord(payload) && typeof payload.detail === 'string' ? payload.detail : 'Impossible de charger les conditions de ce produit.');
+      return publishedSubscriptionTerms(payload, new Date().toISOString().slice(0, 10));
+    }).then((terms) => {
+      if (controller.signal.aborted) return;
+      setProductTerms(terms);
+      const latest = terms[0];
+      setDraft((current) => ({ ...current, productTermsVersionId: latest?.termsVersionId ?? '', ...(latest ? { investorNisba: latest.investorNisba, bankNisba: latest.bankNisba } : {}) }));
+      if (!latest) setTermsError('Aucune version publiée et en vigueur. Publiez les conditions dans Produits avant de souscrire.');
+    }).catch((cause: unknown) => { if (!controller.signal.aborted) setTermsError(cause instanceof Error ? cause.message : 'Chargement des conditions impossible.'); }).finally(() => { if (!controller.signal.aborted) setTermsLoading(false); });
+    return () => controller.abort();
+  }, [draft.productId]);
   const availableActions = useMemo(() => actionsForStatus(subscription?.status ?? '', termsAccepted), [subscription?.status, termsAccepted]);
   const selectedAction = availableActions.includes(actionType) ? actionType : availableActions[0] ?? '';
   const draftErrors = subscriptionDraftFieldErrors(draft);
@@ -184,6 +214,23 @@ export function SubscriptionConsole() {
     setSubscription(undefined);
     setTermsAccepted(false);
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function selectProduct(productId: string) {
+    operations.current.invalidate();
+    setDraft((current) => ({ ...current, productId, productTermsVersionId: '' }));
+    setSubscription(undefined);
+    setTermsAccepted(false);
+    setError('');
+  }
+
+  function resetDraft() {
+    setDraft({ accountId: crypto.randomUUID(), customerId: '', productId: '', productTermsVersionId: '', contractVersion: '1.0', investorNisba: '70', bankNisba: '30', currency: 'DZD' });
+    setSubscription(undefined);
+    setTermsAccepted(false);
+    setDraftAttempted(false);
+    setError('');
+    setMessage('Nouvelle saisie. Les souscriptions déjà enregistrées sont conservées.');
   }
 
   async function run(work: (signal: AbortSignal) => Promise<InvestmentSubscription>, success: string, acceptedTerms = false) {
@@ -218,9 +265,12 @@ export function SubscriptionConsole() {
       <h2 id="subscription-create-title">Nouvelle souscription</h2>
       <form className={styles.form} onSubmit={create} noValidate>
         <Identifier id="subscription-account-id" label="Compte" value={draft.accountId} error={visibleDraftError('accountId')} disabled={busy} onChange={(value) => changeDraft('accountId', value)} />
-        <Identifier id="subscription-customer-id" label="Client" value={draft.customerId} error={visibleDraftError('customerId')} disabled={busy} onChange={(value) => changeDraft('customerId', value)} />
-        <Identifier id="subscription-product-id" label="Produit" value={draft.productId} error={visibleDraftError('productId')} disabled={busy} onChange={(value) => changeDraft('productId', value)} />
-        <Identifier id="subscription-terms-id" label="Version des conditions" value={draft.productTermsVersionId} error={visibleDraftError('productTermsVersionId')} disabled={busy} onChange={(value) => changeDraft('productTermsVersionId', value)} />
+        <EntityCatalog compact label="Client" kind="customers" selectedId={draft.customerId} disabled={busy} onSelect={(customerId) => changeDraft('customerId', customerId)} />
+        <FieldError id="subscription-customer-id">{visibleDraftError('customerId')}</FieldError>
+        <EntityCatalog compact label="Produit" kind="products" selectedId={draft.productId} disabled={busy} onSelect={selectProduct} />
+        <FieldError id="subscription-product-id">{visibleDraftError('productId')}</FieldError>
+        <label className={styles.field}>Version des conditions<select id="subscription-terms-id" value={draft.productTermsVersionId} disabled={busy || termsLoading || productTerms.length === 0} required onChange={(event) => { const selected = productTerms.find((item) => item.termsVersionId === event.target.value); if (selected) { operations.current.invalidate(); setSubscription(undefined); setTermsAccepted(false); setDraft((current) => ({ ...current, productTermsVersionId: selected.termsVersionId, investorNisba: selected.investorNisba, bankNisba: selected.bankNisba })); } }} {...errorProps('subscription-terms-id', visibleDraftError('productTermsVersionId'))}><option value="">{termsLoading ? 'Chargement…' : 'Sélectionner une version publiée'}</option>{productTerms.map((item) => <option key={item.termsVersionId} value={item.termsVersionId}>Version {item.version} — depuis le {item.effectiveFrom} — {item.investorNisba} / {item.bankNisba} %</option>)}</select><FieldError id="subscription-terms-id">{visibleDraftError('productTermsVersionId')}</FieldError></label>
+        {termsError && <p className={`${styles.notice} ${styles.error}`} role="alert">{termsError}</p>}
         <div className={styles.row}>
           <label className={styles.field}>Version du contrat<input id="subscription-contract-version" required disabled={busy} value={draft.contractVersion} onChange={(event) => changeDraft('contractVersion', event.target.value)} {...errorProps('subscription-contract-version', visibleDraftError('contractVersion'))} /><FieldError id="subscription-contract-version">{visibleDraftError('contractVersion')}</FieldError></label>
           <label className={styles.field}>Devise<input id="subscription-currency" required disabled={busy} maxLength={3} value={draft.currency} onChange={(event) => changeDraft('currency', event.target.value.toUpperCase())} {...errorProps('subscription-currency', visibleDraftError('currency'))} /><FieldError id="subscription-currency">{visibleDraftError('currency')}</FieldError></label>
@@ -229,7 +279,7 @@ export function SubscriptionConsole() {
           <label className={styles.field}>Nisba investisseur (%)<input id="subscription-investor-nisba" required disabled={busy} inputMode="decimal" value={draft.investorNisba} onChange={(event) => changeDraft('investorNisba', event.target.value)} {...errorProps('subscription-investor-nisba', visibleDraftError('investorNisba'))} /><FieldError id="subscription-investor-nisba">{visibleDraftError('investorNisba')}</FieldError></label>
           <label className={styles.field}>Nisba banque (%)<input id="subscription-bank-nisba" required disabled={busy} inputMode="decimal" value={draft.bankNisba} onChange={(event) => changeDraft('bankNisba', event.target.value)} {...errorProps('subscription-bank-nisba', visibleDraftError('bankNisba'))} /><FieldError id="subscription-bank-nisba">{visibleDraftError('bankNisba')}</FieldError></label>
         </div>
-        <button className={styles.button} disabled={busy}>{busy ? 'Pré-simulation…' : 'Pré-simuler la souscription'}</button>
+        <div className={styles.actions}><button className={styles.button} disabled={busy || termsLoading || !draft.productTermsVersionId || Boolean(subscription)}>{busy ? 'Pré-simulation…' : 'Créer le brouillon'}</button><button className={styles.secondary} type="button" disabled={busy} onClick={resetDraft}>Nouvelle souscription</button></div>
       </form>
       <Feedback error={error} message={message} />
     </section>

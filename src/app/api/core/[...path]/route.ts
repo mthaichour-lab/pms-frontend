@@ -54,6 +54,8 @@ import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { sessionCookieName } from '@/auth/options';
+import { backendSession, forwardCore } from '@/auth/backend-session';
+import { backendFetch } from '@/auth/backend-fetch';
 
 interface RouteContext {
   params: Promise<{ path: string[] }>;
@@ -73,14 +75,11 @@ async function authenticatedClient(request: NextRequest) {
   if (!sessionSecret && process.env['NODE_ENV'] === 'production') {
     throw new Error('NEXTAUTH_SECRET is required in production');
   }
-  const token = await getToken({
-    req: request,
-    secret: sessionSecret ?? 'local-development-secret-change-me',
-    cookieName: sessionCookieName(),
-  });
+  const token = await backendSession(request);
   if (typeof token?.accessToken !== 'string') return undefined;
 
   return createPmsApiClient({
+    fetch: backendFetch,
     baseUrl: process.env['CORE_API_URL'] ?? 'http://localhost:3001',
     accessToken: () => token.accessToken as string,
   });
@@ -89,14 +88,10 @@ async function authenticatedClient(request: NextRequest) {
 async function authenticatedCatalog(request: NextRequest, kind: CatalogKind, correlationId: string): Promise<Response | undefined> {
   const sessionSecret = process.env['NEXTAUTH_SECRET'];
   if (!sessionSecret && process.env['NODE_ENV'] === 'production') throw new Error('NEXTAUTH_SECRET is required in production');
-  const token = await getToken({
-    req: request,
-    secret: sessionSecret ?? 'local-development-secret-change-me',
-    cookieName: sessionCookieName(),
-  });
+  const token = await backendSession(request);
   if (typeof token?.accessToken !== 'string') return undefined;
   const baseUrl = process.env['CORE_API_URL'] ?? 'http://localhost:3001';
-  return fetch(`${baseUrl}/${kind}?limit=50&offset=0`, {
+  return fetch(`${baseUrl.replace(/\/$/, '').replace(/\/api$/, '')}/api/${kind}?limit=100&offset=0`, {
     cache: 'no-store',
     headers: {
       accept: 'application/json',
@@ -116,7 +111,7 @@ function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
       return [{ id: value.productId, label: value.code, detail: value.name, status: value.status }];
     }
     if (kind === 'customers' && typeof value.customerId === 'string' && typeof value.segment === 'string' && typeof value.kycStatus === 'string') {
-      return [{ id: value.customerId, label: `Client ${value.customerId.slice(0, 8)}`, detail: `${value.segment} · KYC ${value.kycStatus}`, status: value.kycStatus }];
+      return [{ id: value.customerId, label: `Client ${value.customerId}`, detail: `${value.segment} · KYC ${value.kycStatus}`, status: value.kycStatus }];
     }
     if (kind === 'investment-pools' && typeof value.poolId === 'string' && typeof value.displayName === 'string' && typeof value.currency === 'string' && typeof value.status === 'string') {
       return [{ id: value.poolId, label: value.poolId, detail: `${value.displayName} · ${value.currency}`, status: value.status }];
@@ -126,6 +121,10 @@ function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
+  const requestedPath = (await context.params).path;
+  if (requestedPath.length === 3 && requestedPath[0] === 'products' && requestedPath[2] === 'terms' && isUuid(requestedPath[1])) {
+    return forwardCore(request, `products/${encodeURIComponent(requestedPath[1])}/terms`);
+  }
   const requestCorrelationId = correlationId(request);
   const client = await authenticatedClient(request);
   if (!client) return problem(401, 'Unauthenticated', requestCorrelationId);

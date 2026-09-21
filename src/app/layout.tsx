@@ -25,6 +25,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{__html: "try{const t=localStorage.getItem('pms-theme');document.documentElement.dataset.theme=t==='light'?'light':'dark'}catch{}"}} />
       </head>
       <body>
+        {session?.error && <aside role="alert" style={{ padding: '1rem', background: '#742c25', color: '#fff' }}>Votre session a expiré. <a href="/api/auth/signin" style={{ color: 'inherit', textDecoration: 'underline' }}>Reconnectez-vous pour reprendre vos opérations.</a></aside>}
         <WorkspaceFrame userName={session?.user?.name ?? session?.user?.email} roles={session?.user?.roles ?? []} locale={locale}>{children}</WorkspaceFrame>
         <ThemeToggle />
       </body>

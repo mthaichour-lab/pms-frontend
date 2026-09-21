@@ -60,6 +60,7 @@ export function WorkspaceFrame({ children, userName, roles, locale }: WorkspaceF
     { label: t.restitution, items: [
       { label: t.reporting, icon: "report", href: "/reporting" },
       { label: t.audit, icon: "audit", href: "/audit" },
+      { label: "Utilisateurs et rôles", icon: "users", href: "/users" },
     ] },
   ] satisfies readonly { label: string; items: readonly NavigationItem[] }[], [t]);
 

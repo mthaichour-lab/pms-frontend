@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth';
 import type { OAuthConfig } from 'next-auth/providers/oauth';
 
 import { mapGroupsToRoles, type PmsRole } from './roles';
+import { refreshAccessToken } from './refresh-token';
 
 interface OidcProfile extends Record<string, unknown> {
   sub: string;
@@ -102,7 +103,13 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, account, user }) {
-      if (account?.access_token) token.accessToken = account.access_token;
+      if (account?.access_token) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.accessTokenExpires = (account.expires_at ?? 0) * 1000;
+        token.error = undefined;
+        token.roles = [];
+      }
       const tokenRoles = rolesFromOidcTokens(
         account?.access_token ?? (typeof token.accessToken === 'string' ? token.accessToken : undefined),
         account?.id_token,
@@ -114,10 +121,11 @@ export const authOptions: NextAuthOptions = {
         const existingRoles = Array.isArray(token.roles) ? token.roles as PmsRole[] : [];
         token.roles = [...new Set([...existingRoles, ...profileRoles, ...tokenRoles])].sort();
       }
-      return token;
+      return refreshAccessToken(token);
     },
     async session({ session, token }) {
       if (session.user) session.user.roles = (token.roles as PmsRole[]) ?? [];
+      session.error = token.error;
       return session;
     },
   },

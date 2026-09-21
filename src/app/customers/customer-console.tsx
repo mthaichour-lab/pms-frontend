@@ -2,7 +2,7 @@
 import { FormEvent, useEffect, useRef, useState, type ReactNode } from 'react';
 import { type CustomerProfile, type LegalRestriction } from './customer-api';
 import styles from '../products/products.module.css';
-import { EntityCatalog } from '../entity-catalog';
+import { EntityCatalog, notifyCatalogChanged } from '../entity-catalog';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const token = /^tok_[A-Za-z0-9_-]{16,128}$/;
@@ -118,8 +118,8 @@ export function CustomerConsole() {
 
   function changeDraft(field: CustomerField, value: string) {
     operations.current.invalidate();
-    setDraft((current) => ({ ...current, [field]: value }));
-    setProfile(undefined);
+    setDraft((current) => field === 'customerId' && current.customerId !== value ? { ...initialProfile, customerId: value } : { ...current, [field]: value });
+    if (field === 'customerId') setProfile(undefined);
     setMessage('');
   }
   async function run(work: (signal: AbortSignal) => Promise<CustomerProfile>, success: string) {
@@ -132,17 +132,27 @@ export function CustomerConsole() {
   }
   async function lookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await loadCustomer(draft.customerId);
+  }
+  async function loadCustomer(customerId: string) {
     setProfileAttempted(true);
-    if (profileErrors.customerId) return setError(profileErrors.customerId);
-    const customerId = draft.customerId;
+    if (!uuid.test(customerId)) return setError('Saisissez un UUID client valide.');
     await run((signal) => customerRequest(`/${encodeURIComponent(customerId)}`, undefined, isCustomerProfile, signal), 'Profil client chargé.');
+  }
+  function selectCustomer(customerId: string) {
+    changeDraft('customerId', customerId);
+    void loadCustomer(customerId);
   }
   async function create() {
     setProfileAttempted(true);
     const firstError = Object.values(profileErrors)[0];
     if (firstError) return setError(firstError);
-    const snapshot = snapshotCustomerProfile({ ...draft, restrictions: [] });
-    await run((signal) => customerRequest('', snapshot, isCustomerProfile, signal), 'Profil client créé.');
+    const snapshot = snapshotCustomerProfile(draft);
+    await run(async (signal) => {
+      const saved = await customerRequest('', snapshot, isCustomerProfile, signal);
+      notifyCatalogChanged('customers');
+      return saved;
+    }, profile ? 'Modifications du profil enregistrées.' : 'Profil client créé.');
   }
   async function addRestriction() {
     if (!profile) return;
@@ -159,14 +169,16 @@ export function CustomerConsole() {
     await run((signal) => customerRequest(`/${encodeURIComponent(customerId)}/restrictions/${encodeURIComponent(restrictionId)}/lift`, { liftedAt }, isCustomerProfile, signal), 'Restriction levée.');
   }
 
-  return <><EntityCatalog kind="customers" selectedId={draft.customerId} disabled={busy} onSelect={(customerId) => changeDraft('customerId', customerId)} /><div className={styles.grid} aria-busy={busy}>
+  return <><EntityCatalog kind="customers" selectedId={draft.customerId} disabled={busy} onSelect={selectCustomer} /><div className={styles.grid} aria-busy={busy}>
     <section className={styles.card} aria-labelledby="customer-profile-title">
       <h2 id="customer-profile-title">Profil client tokenisé</h2>
       <form className={styles.form} onSubmit={lookup} noValidate>
         <CustomerProfileFields profile={draft} errors={visibleProfileErrors} busy={busy} onChange={changeDraft} />
         <div className={styles.actions}>
           <button className={styles.secondary} disabled={busy}>{busy ? 'Chargement…' : 'Consulter'}</button>
-          <button type="button" className={styles.button} disabled={busy} onClick={() => void create()}>{busy ? 'Traitement…' : 'Créer'}</button>
+          <button type="button" className={styles.button} disabled={busy} onClick={() => void create()}>{busy ? 'Traitement…' : profile ? 'Modifier' : 'Créer'}</button>
+          <button type="button" className={styles.secondary} disabled={busy} onClick={() => { operations.current.invalidate(); setDraft({ ...initialProfile, customerId: crypto.randomUUID() }); setProfile(undefined); setProfileAttempted(false); setError(''); setMessage('Nouveau client : identifiant généré.'); }}>Nouveau client</button>
+          <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDraft(profile ? snapshotCustomerProfile(profile) : initialProfile); setProfileAttempted(false); setError(''); setMessage('Saisie annulée. Aucun client enregistré n’a été supprimé.'); }}>Annuler les saisies</button>
         </div>
       </form>
       <div aria-live="polite" aria-atomic="true">{error && <p className={`${styles.notice} ${styles.error}`} role="alert">{error}</p>}{message && <p className={styles.notice} role="status">{message}</p>}</div>

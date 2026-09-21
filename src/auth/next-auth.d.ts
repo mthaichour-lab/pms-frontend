@@ -3,6 +3,7 @@ import type { PmsRole } from './roles';
 
 declare module 'next-auth' {
   interface Session {
+    error?: string;
     user: DefaultSession['user'] & { roles: PmsRole[] };
   }
 
@@ -13,8 +14,10 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
+    refreshToken?: string;
+    accessTokenExpires?: number;
+    error?: string;
     accessToken?: string;
     roles?: PmsRole[];
   }
 }
-

@@ -1,109 +1,79 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import styles from "./products/products.module.css";
 
-type CatalogKind = "products" | "customers" | "investment-pools";
+export type CatalogKind = "products" | "customers" | "investment-pools";
+export type CatalogItem = { readonly id: string; readonly label: string; readonly detail: string; readonly status: string };
+const titles: Record<CatalogKind, string> = { products: "Produits disponibles", customers: "Clients disponibles", "investment-pools": "Pools disponibles" };
+function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 
-type CatalogItem = {
-  readonly id: string;
-  readonly label: string;
-  readonly detail: string;
-  readonly status: string;
-};
-
-const demoCatalogs: Record<CatalogKind, readonly CatalogItem[]> = {
-  products: [
-    ["10000000-0000-4000-8000-000000000003", "AL_AMAL_RENDEMENT", "Al Amal Rendement", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000012", "AMANA_DYNAMIQUE", "Amana Dynamique", "VALIDATED"],
-    ["10000000-0000-4000-8000-000000000010", "ASSALA_ACTIONS", "Assala Actions", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000002", "BARAKA_CROISSANCE", "Baraka Croissance", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000005", "FONDS_PME_HALAL", "Fonds PME Halal", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000006", "ISTITHMAR_EQUILIBRE", "Al Istithmar Équilibré", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000001", "MUDARABA_STD", "Compte Moudaraba standard", "DRAFT"],
-    ["10000000-0000-4000-8000-000000000009", "NOUR_TRESORERIE", "Nour Trésorerie", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000008", "RIBH_INTERNATIONAL", "Ribh International", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000004", "SUKUK_IMMOBILIER", "Sukuk Immobilier", "PUBLISHED"],
-    ["10000000-0000-4000-8000-000000000007", "TAZKIA_SELECTIF", "Tazkia Sélectif", "SUSPENDED"],
-    ["10000000-0000-4000-8000-000000000011", "WAFAA_OBLIGATIONS", "Wafaa Obligations", "CLOSED"],
-  ].map(([id, label, detail, status]) => ({ id, label, detail, status })),
-  customers: [
-    ["20000000-0000-4000-8000-000000000001", "Client 001", "Retail · KYC vérifié", "VERIFIED"],
-    ["20000000-0000-4000-8000-000000000002", "Client 002", "Corporate · KYC vérifié", "VERIFIED"],
-    ["20000000-0000-4000-8000-000000000003", "Client 003", "PME · KYC vérifié", "VERIFIED"],
-    ["20000000-0000-4000-8000-000000000004", "Client 004", "Institutionnel · KYC vérifié", "VERIFIED"],
-    ["20000000-0000-4000-8000-000000000005", "Client 005", "Retail · KYC en attente", "PENDING"],
-    ["20000000-0000-4000-8000-000000000006", "Client 006", "Corporate · KYC expiré", "EXPIRED"],
-    ["20000000-0000-4000-8000-000000000007", "Client 007", "PME · KYC vérifié", "VERIFIED"],
-    ["20000000-0000-4000-8000-000000000008", "Client 008", "Retail · KYC rejeté", "REJECTED"],
-  ].map(([id, label, detail, status]) => ({ id, label, detail, status })),
-  "investment-pools": [
-    ["EQUIPMENT", "EQUIPMENT", "Financement équipement · DZD", "ACTIVE"],
-    ["GLOBAL_POOL", "GLOBAL_POOL", "Pool global participatif · DZD", "ACTIVE"],
-    ["REAL_ESTATE", "REAL_ESTATE", "Financement immobilier · DZD", "ACTIVE"],
-  ].map(([id, label, detail, status]) => ({ id, label, detail, status })),
-};
-
-const titles: Record<CatalogKind, string> = {
-  products: "Produits disponibles",
-  customers: "Clients disponibles",
-  "investment-pools": "Pools disponibles",
-};
-
-function isCatalogItem(value: unknown): value is CatalogItem {
-  return typeof value === "object" && value !== null &&
-    typeof (value as Record<string, unknown>).id === "string" &&
-    typeof (value as Record<string, unknown>).label === "string" &&
-    typeof (value as Record<string, unknown>).detail === "string" &&
-    typeof (value as Record<string, unknown>).status === "string";
+export function catalogPayload(kind: CatalogKind, value: unknown): readonly CatalogItem[] {
+  const rows = Array.isArray(value) ? value : record(value) && Array.isArray(value.items) ? value.items : undefined;
+  if (!rows) throw new Error("Réponse du catalogue invalide.");
+  return rows.map((row: unknown) => {
+    if (!record(row)) throw new Error("Entrée du catalogue invalide.");
+    if (["id", "label", "detail", "status"].every((key) => typeof row[key] === "string")) return row as CatalogItem;
+    if (kind === "products" && typeof row.productId === "string" && typeof row.code === "string" && typeof row.name === "string" && typeof row.status === "string") return { id: row.productId, label: row.code, detail: row.name, status: row.status };
+    if (kind === "customers" && typeof row.customerId === "string" && typeof row.segment === "string" && typeof row.kycStatus === "string") return { id: row.customerId, label: `Client ${row.customerId}`, detail: row.segment, status: row.kycStatus };
+    if (kind === "investment-pools" && typeof row.poolId === "string" && typeof row.displayName === "string" && typeof row.currency === "string" && typeof row.status === "string") return { id: row.poolId, label: row.poolId, detail: `${row.displayName} · ${row.currency}`, status: row.status };
+    throw new Error("Entrée du catalogue invalide.");
+  });
 }
-
-function catalogPayload(value: unknown): readonly CatalogItem[] | undefined {
-  if (Array.isArray(value) && value.every(isCatalogItem)) return value;
-  if (typeof value === "object" && value !== null && Array.isArray((value as Record<string, unknown>).items)) {
-    const items = (value as Record<string, unknown>).items as unknown[];
-    return items.every(isCatalogItem) ? items : undefined;
-  }
-  return undefined;
+export function filterCatalog(items: readonly CatalogItem[], query: string): readonly CatalogItem[] {
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
+  const search = normalize(query.trim());
+  return items.filter((item) => normalize(`${item.id} ${item.label} ${item.detail} ${item.status}`).includes(search));
 }
+export function notifyCatalogChanged(kind: CatalogKind) { window.dispatchEvent(new CustomEvent("pms-catalog-changed", { detail: kind })); }
 
-export function EntityCatalog({ kind, selectedId, onSelect, disabled = false }: {
-  readonly kind: CatalogKind;
-  readonly selectedId: string;
-  readonly onSelect: (id: string) => void;
-  readonly disabled?: boolean;
+export function EntityCatalog({ kind, selectedId, onSelect, disabled = false, compact = false, label }: {
+  readonly kind: CatalogKind; readonly selectedId: string; readonly onSelect: (id: string) => void;
+  readonly disabled?: boolean; readonly compact?: boolean; readonly label?: string;
 }) {
-  const [items, setItems] = useState<readonly CatalogItem[]>(demoCatalogs[kind]);
-  const [source, setSource] = useState<"demo" | "live">("demo");
-
+  const id = useId();
+  const [items, setItems] = useState<readonly CatalogItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const changed = (event: Event) => { if ((event as CustomEvent).detail === kind) setRevision((value) => value + 1); };
+    window.addEventListener("pms-catalog-changed", changed);
+    return () => window.removeEventListener("pms-catalog-changed", changed);
+  }, [kind]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/core/${kind}`, { signal: controller.signal, headers: { accept: "application/json" } })
-      .then(async (response) => response.ok ? catalogPayload(await response.json()) : undefined)
-      .then((payload) => { if (!controller.signal.aborted && payload?.length) { setItems(payload); setSource("live"); } })
-      .catch(() => undefined);
+    setLoading(true); setError("");
+    async function load() {
+      const all: CatalogItem[] = [];
+      let offset = 0;
+      while (!controller.signal.aborted) {
+        const response = await fetch(`/api/core/${kind}?limit=100&offset=${offset}`, { signal: controller.signal, headers: { accept: "application/json" }, cache: "no-store" });
+        const payload: unknown = await response.json().catch(() => undefined);
+        if (!response.ok) throw new Error(record(payload) && typeof payload.detail === "string" ? payload.detail : `Impossible de charger le catalogue (HTTP ${response.status}).`);
+        const page = catalogPayload(kind, payload);
+        all.push(...page);
+        const total = record(payload) && typeof payload.total === "number" ? payload.total : all.length;
+        if (page.length === 0 || all.length >= total) break;
+        offset += page.length;
+      }
+      if (!controller.signal.aborted) setItems(all);
+    }
+    void load().catch((cause: unknown) => { if (!controller.signal.aborted) { setItems([]); setError(cause instanceof Error ? cause.message : "Chargement impossible."); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [kind]);
-
-  return <section className={styles.catalog} aria-labelledby={`${kind}-catalog-title`}>
-    <div className={styles.catalogHead}>
-      <div><p>Référentiel</p><h2 id={`${kind}-catalog-title`}>{titles[kind]}</h2></div>
-      <span className={styles.catalogSource}>{source === "live" ? "Synchronisé" : "Données de test"}</span>
-    </div>
-    <label className={styles.field} htmlFor={`${kind}-selector`}>Sélection rapide
-      <select id={`${kind}-selector`} value={selectedId} disabled={disabled} onChange={(event) => onSelect(event.target.value)}>
-        <option value="">Choisir dans la liste…</option>
-        {items.map((item) => <option key={item.id} value={item.id}>{item.label} — {item.detail}</option>)}
-      </select>
-    </label>
-    <div className={styles.tableWrap} data-layout-scroll-region>
-      <table>
-        <thead><tr><th>Référence</th><th>Libellé</th><th>Statut</th><th><span className={styles.srOnly}>Action</span></th></tr></thead>
-        <tbody>{items.map((item) => <tr key={item.id} aria-selected={selectedId === item.id}>
-          <td className={styles.catalogId}>{item.label}</td><td>{item.detail}</td><td><span className={styles.badge}>{item.status}</span></td>
-          <td><button className={styles.secondary} type="button" disabled={disabled} onClick={() => onSelect(item.id)}>Choisir</button></td>
-        </tr>)}</tbody>
-      </table>
-    </div>
+  }, [kind, revision]);
+  const visible = filterCatalog(items, query);
+  return <section className={compact ? styles.form : styles.catalog} aria-label={label ?? titles[kind]} aria-busy={loading}>
+    {!compact && <div className={styles.catalogHead}><div><p>Référentiel</p><h2>{titles[kind]}</h2></div><button type="button" className={styles.secondary} disabled={loading || disabled} onClick={() => setRevision((value) => value + 1)}>Actualiser</button></div>}
+    <label className={styles.field} htmlFor={`${id}-search`}>Rechercher {label?.toLocaleLowerCase("fr") ?? "dans le catalogue"}<input id={`${id}-search`} type="search" value={query} placeholder="Nom, référence ou statut…" onChange={(event) => setQuery(event.target.value)} disabled={disabled} /></label>
+    <label className={styles.field} htmlFor={`${id}-selector`}>{label ?? "Sélection rapide"}<select id={`${id}-selector`} value={selectedId} disabled={disabled || loading || Boolean(error)} onChange={(event) => { if (event.target.value) onSelect(event.target.value); }}>
+      <option value="">{loading ? "Chargement…" : "Choisir dans la liste…"}</option>
+      {selectedId && !visible.some((item) => item.id === selectedId) && <option value={selectedId}>{items.find((item) => item.id === selectedId)?.label ?? selectedId} — sélection actuelle</option>}
+      {visible.map((item) => <option key={item.id} value={item.id}>{item.label} — {item.detail} ({item.status})</option>)}
+    </select></label>
+    {error && <p className={`${styles.notice} ${styles.error}`} role="alert">{error} <button type="button" className={styles.secondary} disabled={disabled || loading} onClick={() => setRevision((value) => value + 1)}>Réessayer</button></p>}
+    {!loading && !error && <p className={styles.hint} role="status">{visible.length} résultat{visible.length > 1 ? "s" : ""}{query ? ` pour « ${query} »` : ""}.</p>}
+    {!compact && visible.length > 0 && <div className={styles.tableWrap} data-layout-scroll-region><table><thead><tr><th>Référence</th><th>Libellé</th><th>Statut</th><th><span className={styles.srOnly}>Action</span></th></tr></thead><tbody>{visible.map((item) => <tr key={item.id} aria-selected={selectedId === item.id}><td className={styles.catalogId}>{item.label}</td><td>{item.detail}</td><td><span className={styles.badge}>{item.status}</span></td><td><button className={styles.secondary} type="button" disabled={disabled || loading} onClick={() => onSelect(item.id)}>Choisir</button></td></tr>)}</tbody></table></div>}
   </section>;
 }
