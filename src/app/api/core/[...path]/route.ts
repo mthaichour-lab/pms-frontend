@@ -122,8 +122,38 @@ function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestedPath = (await context.params).path;
+  if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
+    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
+    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
+    const poolId = request.nextUrl.searchParams.get('poolId')?.trim();
+    const status = request.nextUrl.searchParams.get('status')?.trim();
+    const parsedLimit = Number(limit), parsedOffset = Number(offset);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100 ||
+      !Number.isSafeInteger(parsedOffset) || parsedOffset < 0 ||
+      poolId !== undefined && poolId !== '' && !/^[A-Za-z0-9][A-Za-z0-9._:-]{1,63}$/.test(poolId) ||
+      status !== undefined && status !== '' && !/^[A-Z][A-Z0-9_]{1,63}$/.test(status)) {
+      return problem(400, 'Invalid calculation filters', correlationId(request));
+    }
+    const query = new URLSearchParams({ limit, offset });
+    if (poolId) query.set('poolId', poolId);
+    if (status) query.set('status', status);
+    return forwardCore(request, `calculations?${query}`);
+  }
   if (requestedPath.length === 3 && requestedPath[0] === 'products' && requestedPath[2] === 'terms' && isUuid(requestedPath[1])) {
     return forwardCore(request, `products/${encodeURIComponent(requestedPath[1])}/terms`);
+  }
+  if (requestedPath.length === 2 && requestedPath[0] === 'investment-accounts' && requestedPath[1] === 'subscriptions') {
+    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
+    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
+    const parsedLimit = Number(limit), parsedOffset = Number(offset);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100 || !Number.isSafeInteger(parsedOffset) || parsedOffset < 0) {
+      return problem(400, 'Invalid subscription pagination', correlationId(request));
+    }
+    return forwardCore(request, `investment-accounts/subscriptions?${new URLSearchParams({ limit, offset })}`);
+  }
+  if (requestedPath.length === 3 && requestedPath[0] === 'investment-accounts' && requestedPath[1] === 'subscriptions') {
+    if (!isUuid(requestedPath[2])) return problem(400, 'Valid subscription account identifier is required', correlationId(request));
+    return forwardCore(request, `investment-accounts/subscriptions/${encodeURIComponent(requestedPath[2])}`);
   }
   const requestCorrelationId = correlationId(request);
   const client = await authenticatedClient(request);
@@ -286,6 +316,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
+  const requestedPath = (await context.params).path;
+  if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
+    const requestCorrelationId = request.headers.get('x-correlation-id');
+    if (!requestCorrelationId || !isUuid(requestCorrelationId)) return problem(400, 'Valid X-Correlation-Id is required', requestCorrelationId ?? crypto.randomUUID());
+    const body: unknown = await request.clone().json().catch(() => undefined);
+    if (!isCalculationDispatchCommand(body)) return problem(400, 'Invalid calculation initiation request', requestCorrelationId);
+    return forwardCore(request, 'calculations');
+  }
   const requestCorrelationId = correlationId(request);
   const client = await authenticatedClient(request);
   if (!client) return problem(401, 'Unauthenticated', requestCorrelationId);
@@ -710,6 +748,30 @@ function isSecureExportGeneration(value: unknown): value is SecureExportGenerati
   if (!dataset || typeof dataset !== 'object') return false;
   const record = dataset as Record<string, unknown>;
   return Array.isArray(record['columns']) && record['columns'].length > 0 && Array.isArray(record['rows']);
+}
+
+interface CalculationDispatchCommand {
+  runId: string;
+  poolId: string;
+  businessDate: string;
+  rulesVersion: string;
+  runKind?: 'PARALLEL' | 'PRODUCTION';
+  participantBasis: { type: 'ACTIVE_SUBSCRIPTIONS'; weightBasis: 'LATEST_POSITION' | 'SUBSCRIPTION_LEDGER_BALANCE' };
+}
+
+function isCalculationDispatchCommand(value: unknown): value is CalculationDispatchCommand {
+  if (!value || typeof value !== 'object') return false;
+  const command = value as Record<string, unknown>;
+  const basis = command['participantBasis'];
+  if (!basis || typeof basis !== 'object') return false;
+  const participantBasis = basis as Record<string, unknown>;
+  return isUuid(command['runId']) &&
+    typeof command['poolId'] === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{1,63}$/.test(command['poolId']) &&
+    isDate(command['businessDate']) &&
+    typeof command['rulesVersion'] === 'string' && command['rulesVersion'].trim().length > 0 && command['rulesVersion'].length <= 128 &&
+    (command['runKind'] === undefined || command['runKind'] === 'PARALLEL' || command['runKind'] === 'PRODUCTION') &&
+    participantBasis['type'] === 'ACTIVE_SUBSCRIPTIONS' &&
+    (participantBasis['weightBasis'] === 'LATEST_POSITION' || participantBasis['weightBasis'] === 'SUBSCRIPTION_LEDGER_BALANCE');
 }
 
 function isCreateInvestmentPool(value: unknown): value is CreateInvestmentPool {
