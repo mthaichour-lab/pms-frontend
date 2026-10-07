@@ -42,8 +42,10 @@ signé par Keycloak puis vérifie la lecture PostgreSQL à travers Next.js et l'
 ```sh
 cp ../pms-backend/.env.local.example ../pms-backend/.env.local
 cp ../pms-backend/.env.compose.example ../pms-backend/.env.compose
-export PMS_FRONTEND_CONTEXT="$PWD"
-export NEXTAUTH_SECRET="replace-with-at-least-32-characters"
 pnpm run e2e:real
 pnpm run e2e:real:down
 ```
+
+Le script injecte le contexte frontend et un secret de session reserve au test.
+Il utilise le projet Compose `pms-frontend-e2e`, son propre reseau et ses propres
+volumes. La commande `e2e:real:down` supprime uniquement cette pile de recette.

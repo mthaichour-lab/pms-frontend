@@ -1,3 +1,7 @@
+networks:
+  pms:
+    name: pms-frontend-e2e-network
+
 services:
   # The real E2E probe runs inside the Compose network. Avoid publishing the
   # backend stack's developer ports, which prevents collisions with a running
