@@ -9,15 +9,14 @@ const sessionToken = await encode({
   token: { accessToken, sub: "frontend-e2e", name: "Frontend E2E" },
   maxAge: 300,
 });
+const authenticatedHeaders = {
+  cookie: `pms.session-token=${sessionToken}`,
+  "x-correlation-id": randomUUID(),
+};
 
 const response = await fetch(
   `${webUrl}/api/core/reference-data/currencies/DZD?businessDate=2026-01-01`,
-  {
-    headers: {
-      cookie: `pms.session-token=${sessionToken}`,
-      "x-correlation-id": randomUUID(),
-    },
-  },
+  { headers: authenticatedHeaders },
 );
 if (!response.ok) {
   throw new Error(
@@ -28,10 +27,36 @@ const currency = await response.json();
 if (currency.code !== "DZD" || currency.fractionDigits !== 2) {
   throw new Error(`Unexpected BFF response: ${JSON.stringify(currency)}`);
 }
+
+const catalogs = [
+  ["products", "code", "MUDARABA_STD"],
+  ["customers", "customerId", "20000000-0000-4000-8000-000000000001"],
+  ["investment-pools", "poolId", "GLOBAL_POOL"],
+  ["assets", "assetCode", "MUR-ALPHA-001"],
+  ["currencies?businessDate=2026-01-01", "code", "DZD"],
+];
+for (const [path, field, expected] of catalogs) {
+  const catalogResponse = await fetch(`${webUrl}/api/core/${path}`, {
+    headers: { ...authenticatedHeaders, "x-correlation-id": randomUUID() },
+  });
+  if (!catalogResponse.ok) {
+    throw new Error(`Catalog ${path} failed with ${catalogResponse.status}: ${await catalogResponse.text()}`);
+  }
+  const catalog = await catalogResponse.json();
+  if (!Array.isArray(catalog.items) || !catalog.items.some((item) => item?.[field] === expected)) {
+    throw new Error(`Catalog ${path} is missing seeded ${field}=${expected}: ${JSON.stringify(catalog)}`);
+  }
+}
+
+const unauthenticatedResponse = await fetch(`${webUrl}/api/core/products`);
+if (unauthenticatedResponse.status !== 401) {
+  throw new Error(`Catalog without session returned ${unauthenticatedResponse.status}, expected 401`);
+}
 console.log(
   JSON.stringify({
     event: "frontend.e2e.real_bff.passed",
     dependencies: ["nextjs-bff", "keycloak", "backend-api", "postgresql"],
+    verifiedCatalogs: catalogs.length,
   }),
 );
 
