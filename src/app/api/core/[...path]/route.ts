@@ -122,21 +122,6 @@ function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestedPath = (await context.params).path;
-  if (requestedPath.length === 1 && requestedPath[0] === 'currencies') {
-    const businessDate = request.nextUrl.searchParams.get('businessDate') ?? new Date().toISOString().slice(0, 10);
-    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
-    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
-    if (!isExactDate(businessDate) || !/^\d+$/.test(limit) || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || Number(limit) < 1 || Number(limit) > 100) {
-      return problem(400, 'Invalid currency reference query', correlationId(request));
-    }
-    return forwardCore(request, `reference-data/currencies?${new URLSearchParams({ businessDate, limit, offset })}`);
-  }
-  if (requestedPath.length === 1 && requestedPath[0] === 'assets') {
-    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
-    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
-    if (!/^\d+$/.test(limit) || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || Number(limit) < 1 || Number(limit) > 100) return problem(400, 'Invalid asset pagination', correlationId(request));
-    return forwardCore(request, `investment-pools/assets?${new URLSearchParams({ limit, offset })}`);
-  }
   if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
     const limit = request.nextUrl.searchParams.get('limit') ?? '50';
     const offset = request.nextUrl.searchParams.get('offset') ?? '0';
@@ -180,16 +165,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
       correlationId: requestCorrelationId,
       traceparent: request.headers.get('traceparent') ?? undefined,
     };
-    if (path.length === 1 && (path[0] === 'products' || path[0] === 'customers' || path[0] === 'investment-pools')) {
-      const kind = path[0] as CatalogKind;
-      const response = await authenticatedCatalog(request, kind, requestCorrelationId);
-      if (!response) return problem(401, 'Unauthenticated', requestCorrelationId);
-      const payload: unknown = await response.json().catch(() => undefined);
-      if (!response.ok) return NextResponse.json(payload ?? { type: 'about:blank', title: 'Backend unavailable', status: response.status }, {
-        status: response.status,
-        headers: { 'content-type': 'application/problem+json', 'x-correlation-id': requestCorrelationId },
-      });
-      return correlatedJson({ items: catalogEntries(kind, payload) }, requestCorrelationId);
+    if (path.length === 1 && ['products', 'customers', 'investment-pools', 'assets'].includes(path[0] ?? '')) {
+      const limit = Number(request.nextUrl.searchParams.get('limit') ?? '50');
+      const offset = Number(request.nextUrl.searchParams.get('offset') ?? '0');
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) return problem(400, 'Invalid catalog pagination', requestCorrelationId);
+      if (path[0] === 'products') return correlatedJson(await client.listInvestmentProducts({ ...tracing, limit, offset }), requestCorrelationId);
+      if (path[0] === 'customers') return correlatedJson(await client.listCustomerProfiles({ ...tracing, limit, offset }), requestCorrelationId);
+      if (path[0] === 'investment-pools') return correlatedJson(await client.listInvestmentPools({ ...tracing, limit, offset }), requestCorrelationId);
+      return correlatedJson(await client.listAssetPositions({ ...tracing, limit, offset }), requestCorrelationId);
+    }
+    if (path.length === 1 && path[0] === 'currencies') {
+      const businessDate = request.nextUrl.searchParams.get('businessDate') ?? new Date().toISOString().slice(0, 10);
+      const limit = Number(request.nextUrl.searchParams.get('limit') ?? '50');
+      const offset = Number(request.nextUrl.searchParams.get('offset') ?? '0');
+      if (!isExactDate(businessDate) || !Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) return problem(400, 'Invalid currency reference query', requestCorrelationId);
+      return correlatedJson(await client.listEffectiveCurrencies({ ...tracing, businessDate, limit, offset }), requestCorrelationId);
     }
     if (path.length === 2 && path[0] === 'audit' && path[1] === 'events') {
       const parameters = request.nextUrl.searchParams;
@@ -332,12 +322,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const requestedPath = (await context.params).path;
-  if (requestedPath.length === 1 && requestedPath[0] === 'currencies') {
-    const requestCorrelationId = request.headers.get('x-correlation-id') ?? crypto.randomUUID();
-    const body: unknown = await request.clone().json().catch(() => undefined);
-    if (!isCurrencyDefinition(body)) return problem(400, 'Invalid currency reference', requestCorrelationId);
-    return forwardCore(request, 'reference-data/currencies', 'POST', body);
-  }
   if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
     const requestCorrelationId = request.headers.get('x-correlation-id');
     if (!requestCorrelationId || !isUuid(requestCorrelationId)) return problem(400, 'Valid X-Correlation-Id is required', requestCorrelationId ?? crypto.randomUUID());
@@ -360,6 +344,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       correlationId: requestCorrelationId, idempotencyKey,
       traceparent: request.headers.get('traceparent') ?? undefined,
     };
+    if (path.length === 1 && path[0] === 'currencies') {
+      if (!isCurrencyDefinition(body)) return problem(400, 'Invalid currency reference', requestCorrelationId);
+      return correlatedJson(await client.createCurrencyReference({ ...common, command: body }), requestCorrelationId);
+    }
     if (path.length === 3 && path[0] === 'reporting' && path[1] === 'historical-yield-forecasts') {
       if (!/^[A-Za-z0-9._:-]{2,64}$/.test(path[2] ?? '')) return problem(400, 'Invalid forecast pool identifier', requestCorrelationId);
       return correlatedJson(await client.generateHistoricalYieldForecast({ ...common, poolId: path[2] }), requestCorrelationId);
