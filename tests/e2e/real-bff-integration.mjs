@@ -96,12 +96,49 @@ if (pool.poolId !== poolId || pool.status !== "DRAFT") {
 }
 await verifyResource(`investment-pools/${poolId}`, "poolId", poolId);
 
+const accountId = randomUUID();
+const subscriptionPath = `investment-accounts/subscriptions/${accountId}`;
+const subscription = await postResource("investment-accounts/subscriptions", {
+  accountId,
+  customerId,
+  productId: "10000000-0000-4000-8000-000000000002",
+  productTermsVersionId: "11000000-0000-4000-8000-000000000002",
+  contractVersion: "1.0",
+  investorNisba: "72",
+  bankNisba: "28",
+  currency: "DZD",
+});
+if (subscription.accountId !== accountId || subscription.status !== "PRE_SIMULATION") {
+  throw new Error("Subscription creation returned an unexpected pre-simulation");
+}
+const businessDate = new Date().toISOString().slice(0, 10);
+for (const [action, additionalFields, expectedStatus] of [
+  ["START", {}, "PENDING_SUBSCRIPTION"],
+  ["ACCEPT", { acceptedAt: new Date().toISOString(), nonGuaranteeAccepted: true, profitSharingMethodAccepted: true }, "PENDING_SUBSCRIPTION"],
+  ["ACTIVATE", {}, "ACTIVE"],
+  ["DEPOSIT", { amount: "1000" }, "ACTIVE"],
+]) {
+  const result = await postResource(`${subscriptionPath}/actions`, {
+    type: action,
+    businessDate,
+    ...additionalFields,
+  });
+  if (result.accountId !== accountId || result.status !== expectedStatus) {
+    throw new Error(`Subscription ${action} returned an unexpected status`);
+  }
+}
+const accountBalance = await verifyResource(subscriptionPath, "accountId", accountId);
+if (Number(accountBalance.balance) !== 1000 || Number(accountBalance.totalDeposits) !== 1000) {
+  throw new Error(`Subscription balance is incorrect: ${JSON.stringify(accountBalance)}`);
+}
+
 console.log(
   JSON.stringify({
     event: "frontend.e2e.real_bff.passed",
     dependencies: ["nextjs-bff", "keycloak", "backend-api", "postgresql"],
     verifiedCatalogs: catalogs.length,
     verifiedCreations: 3,
+    verifiedSubscriptionBalance: true,
   }),
 );
 
@@ -127,6 +164,7 @@ async function verifyResource(path, field, expected) {
   if (!response.ok) throw new Error(`Read ${path} failed with ${response.status}: ${await response.text()}`);
   const item = await response.json();
   if (item?.[field] !== expected) throw new Error(`Read ${path} returned an unexpected ${field}`);
+  return item;
 }
 
 async function obtainAccessToken() {
