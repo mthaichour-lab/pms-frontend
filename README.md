@@ -48,4 +48,9 @@ pnpm run e2e:real:down
 
 Le script injecte le contexte frontend et un secret de session reserve au test.
 Il utilise le projet Compose `pms-frontend-e2e`, son propre reseau et ses propres
-volumes. La commande `e2e:real:down` supprime uniquement cette pile de recette.
+volumes. Il couvre les catalogues, les creations client/produit/pool, la
+souscription avec depot et solde, puis le financement, l'activation et
+l'allocation d'un actif de recette et le refus d'une sur-allocation. Cet actif
+est insere uniquement dans la base isolee de cette pile. Le journal
+d'allocation etant immuable, lancer `e2e:real:down` avant une nouvelle recette
+complete ; cette commande supprime uniquement la pile de recette.

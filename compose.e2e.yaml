@@ -18,6 +18,30 @@ services:
   api:
     ports: !reset []
 
+  allocation-fixture:
+    image: postgres:16-alpine
+    command:
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -h
+      - postgres
+      - -U
+      - ${POSTGRES_USER:-pms_app}
+      - -d
+      - ${POSTGRES_DB:-pms}
+      - -f
+      - /fixtures/allocation-fixture.sql
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ${PMS_FRONTEND_CONTEXT}/tests/e2e/allocation-fixture.sql:/fixtures/allocation-fixture.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      db-seed: { condition: service_completed_successfully }
+    restart: "no"
+    networks: [pms]
+
   web:
     image: pms-frontend:e2e
     build:
@@ -75,6 +99,7 @@ services:
       - ${PMS_FRONTEND_CONTEXT}/tests/e2e/real-bff-integration.mjs:/app/tests/e2e/real-bff-integration.mjs:ro
     depends_on:
       web: { condition: service_healthy }
+      allocation-fixture: { condition: service_completed_successfully }
     read_only: true
     init: true
     tmpfs:

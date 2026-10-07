@@ -95,6 +95,65 @@ if (pool.poolId !== poolId || pool.status !== "DRAFT") {
   throw new Error("Pool creation returned an unexpected draft");
 }
 await verifyResource(`investment-pools/${poolId}`, "poolId", poolId);
+const fundedPool = await postResource(`investment-pools/${poolId}/funding-sources`, {
+  sourceId: `E2E_EQUITY_${randomUUID().slice(0, 8).toUpperCase()}`,
+  type: "BANK_EQUITY",
+  amount: "1000000",
+  mandateAssetCodes: [],
+});
+if (fundedPool.poolId !== poolId || fundedPool.fundingSources?.length !== 1) {
+  throw new Error("Pool funding did not persist");
+}
+const activePool = await postResource(`investment-pools/${poolId}/activate`, {});
+if (activePool.poolId !== poolId || activePool.status !== "ACTIVE") {
+  throw new Error("Pool activation failed");
+}
+
+const allocationId = randomUUID();
+const assetId = "30000000-0000-4000-8000-0000000000e1";
+const allocation = {
+  allocationId,
+  assetId,
+  percentage: "75",
+  effectiveFrom: "2026-10-07",
+  justification: "Allocation de recette validee pour le pool E2E",
+};
+const simulation = await postResource(`investment-pools/${poolId}/allocations/simulate`, allocation);
+if (simulation.simulated !== true || simulation.executable !== true || Number(simulation.remainingPercentage) !== 25) {
+  throw new Error(`Allocation simulation is not executable: ${JSON.stringify(simulation)}`);
+}
+const recordedAllocation = await postResource(`investment-pools/${poolId}/allocations`, allocation);
+if (recordedAllocation.status !== "CREATED" || recordedAllocation.allocation?.allocationId !== allocationId ||
+    Number(recordedAllocation.remainingPercentage) !== 25) {
+  throw new Error(`Allocation recording failed: ${JSON.stringify(recordedAllocation)}`);
+}
+const allocationHistoryResponse = await fetch(`${webUrl}/api/core/investment-pools/assets/${assetId}/allocations?asOf=2026-10-07`, {
+  headers: { ...authenticatedHeaders, "x-correlation-id": randomUUID() },
+});
+if (!allocationHistoryResponse.ok) {
+  throw new Error(`Allocation history failed with ${allocationHistoryResponse.status}: ${await allocationHistoryResponse.text()}`);
+}
+const allocationHistory = await allocationHistoryResponse.json();
+if (!Array.isArray(allocationHistory) || !allocationHistory.some((entry) => entry.allocationId === allocationId)) {
+  throw new Error(`Allocation history is missing ${allocationId}: ${JSON.stringify(allocationHistory)}`);
+}
+const overallocationResponse = await fetch(`${webUrl}/api/core/investment-pools/${poolId}/allocations/simulate`, {
+  method: "POST",
+  headers: {
+    ...authenticatedHeaders,
+    "content-type": "application/json",
+    "x-correlation-id": randomUUID(),
+    "idempotency-key": randomUUID(),
+  },
+  body: JSON.stringify({
+    ...allocation,
+    allocationId: randomUUID(),
+    percentage: "30",
+  }),
+});
+if (overallocationResponse.status !== 409) {
+  throw new Error(`Overallocation returned ${overallocationResponse.status}, expected 409: ${await overallocationResponse.text()}`);
+}
 
 const accountId = randomUUID();
 const subscriptionPath = `investment-accounts/subscriptions/${accountId}`;
@@ -139,6 +198,9 @@ console.log(
     verifiedCatalogs: catalogs.length,
     verifiedCreations: 3,
     verifiedSubscriptionBalance: true,
+    verifiedPoolActivation: true,
+    verifiedAllocation: true,
+    verifiedOverallocationRejected: true,
   }),
 );
 
