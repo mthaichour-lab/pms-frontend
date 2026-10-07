@@ -18,3 +18,11 @@ COPY --from=build --chown=pms:pms /workspace/.next/static ./.next/static
 USER pms
 EXPOSE 3000
 CMD ["node", "server.js"]
+
+# A dedicated, non-production target for the Docker integration probe. The
+# runtime image remains minimal; this target carries the test dependency graph
+# needed to create an encrypted NextAuth session in the E2E container.
+FROM runtime AS e2e
+USER root
+COPY --from=dependencies --chown=pms:pms /workspace/node_modules ./node_modules
+USER pms

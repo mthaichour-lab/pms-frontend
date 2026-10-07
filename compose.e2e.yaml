@@ -1,9 +1,25 @@
 services:
+  # The real E2E probe runs inside the Compose network. Avoid publishing the
+  # backend stack's developer ports, which prevents collisions with a running
+  # local PMS instance and with Windows-reserved host ports.
+  postgres:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []
+
+  keycloak:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+
   web:
     image: pms-frontend:e2e
     build:
       context: ${PMS_FRONTEND_CONTEXT:?set PMS_FRONTEND_CONTEXT}
       dockerfile: Dockerfile
+      target: runtime
     environment:
       HOSTNAME: 0.0.0.0
       PORT: 3000
@@ -38,7 +54,11 @@ services:
     networks: [pms]
 
   frontend-e2e:
-    image: pms-frontend:e2e
+    image: pms-frontend:e2e-runner
+    build:
+      context: ${PMS_FRONTEND_CONTEXT:?set PMS_FRONTEND_CONTEXT}
+      dockerfile: Dockerfile
+      target: e2e
     command: ["node", "tests/e2e/real-bff-integration.mjs"]
     environment:
       PMS_WEB_URL: http://web:3000
@@ -53,7 +73,8 @@ services:
       web: { condition: service_healthy }
     read_only: true
     init: true
-    tmpfs: [/tmp:size=16m, mode=1777]
+    tmpfs:
+      - /tmp:size=16m,mode=1777
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     networks: [pms]
