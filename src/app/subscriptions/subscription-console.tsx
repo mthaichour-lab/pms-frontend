@@ -2,8 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  getSubscription,
+  isInvestmentSubscriptionBalance,
+  listSubscriptions,
   type CreateInvestmentSubscription,
   type InvestmentSubscription,
+  type InvestmentSubscriptionBalance,
   type InvestmentSubscriptionAction,
 } from './subscription-api';
 import styles from '../products/products.module.css';
@@ -168,11 +172,26 @@ export function SubscriptionConsole() {
   const [productTerms, setProductTerms] = useState<readonly ProductTerms[]>([]);
   const [termsLoading, setTermsLoading] = useState(false);
   const [termsError, setTermsError] = useState('');
+  const [subscriptions, setSubscriptions] = useState<readonly InvestmentSubscriptionBalance[]>([]);
+  const [registryLoading, setRegistryLoading] = useState(true);
+  const [registryError, setRegistryError] = useState('');
+  const [registryQuery, setRegistryQuery] = useState('');
+  const [registryRevision, setRegistryRevision] = useState(0);
+  const [selectedBalance, setSelectedBalance] = useState<InvestmentSubscriptionBalance>();
   const [draftAttempted, setDraftAttempted] = useState(false);
   const [actionAttempted, setActionAttempted] = useState(false);
   const operations = useRef(new SubscriptionOperationCoordinator());
   useEffect(() => { operations.current.mount(); return () => operations.current.unmount(); }, []);
   useEffect(() => { setDraft((current) => current.accountId ? current : { ...current, accountId: crypto.randomUUID() }); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setRegistryLoading(true); setRegistryError('');
+    void listSubscriptions(controller.signal)
+      .then((page) => { if (!controller.signal.aborted) setSubscriptions(page.items); })
+      .catch((cause: unknown) => { if (!controller.signal.aborted) { setSubscriptions([]); setRegistryError(cause instanceof Error ? cause.message : 'Chargement des souscriptions impossible.'); } })
+      .finally(() => { if (!controller.signal.aborted) setRegistryLoading(false); });
+    return () => controller.abort();
+  }, [registryRevision]);
   useEffect(() => {
     const controller = new AbortController();
     setProductTerms([]); setTermsError('');
@@ -186,7 +205,10 @@ export function SubscriptionConsole() {
       if (controller.signal.aborted) return;
       setProductTerms(terms);
       const latest = terms[0];
-      setDraft((current) => ({ ...current, productTermsVersionId: latest?.termsVersionId ?? '', ...(latest ? { investorNisba: latest.investorNisba, bankNisba: latest.bankNisba } : {}) }));
+      setDraft((current) => {
+        const selected = terms.find((item) => item.termsVersionId === current.productTermsVersionId) ?? latest;
+        return { ...current, productTermsVersionId: selected?.termsVersionId ?? '', ...(selected ? { investorNisba: selected.investorNisba, bankNisba: selected.bankNisba } : {}) };
+      });
       if (!latest) setTermsError('Aucune version publiée et en vigueur. Publiez les conditions dans Produits avant de souscrire.');
     }).catch((cause: unknown) => { if (!controller.signal.aborted) setTermsError(cause instanceof Error ? cause.message : 'Chargement des conditions impossible.'); }).finally(() => { if (!controller.signal.aborted) setTermsLoading(false); });
     return () => controller.abort();
@@ -195,6 +217,10 @@ export function SubscriptionConsole() {
   const selectedAction = availableActions.includes(actionType) ? actionType : availableActions[0] ?? '';
   const draftErrors = subscriptionDraftFieldErrors(draft);
   const visibleDraftError = (key: SubscriptionDraftField) => draftAttempted ? draftErrors[key] : undefined;
+  const visibleSubscriptions = useMemo(() => {
+    const query = registryQuery.trim().toLocaleLowerCase('fr');
+    return query ? subscriptions.filter((item) => `${item.accountId} ${item.customerId} ${item.productId} ${item.status} ${item.currency}`.toLocaleLowerCase('fr').includes(query)) : subscriptions;
+  }, [registryQuery, subscriptions]);
 
   function buildAction(): InvestmentSubscriptionAction {
     return {
@@ -212,6 +238,7 @@ export function SubscriptionConsole() {
   function changeDraft<K extends keyof CreateInvestmentSubscription>(key: K, value: CreateInvestmentSubscription[K]) {
     operations.current.invalidate();
     setSubscription(undefined);
+    setSelectedBalance(undefined);
     setTermsAccepted(false);
     setDraft((current) => ({ ...current, [key]: value }));
   }
@@ -220,6 +247,7 @@ export function SubscriptionConsole() {
     operations.current.invalidate();
     setDraft((current) => ({ ...current, productId, productTermsVersionId: '' }));
     setSubscription(undefined);
+    setSelectedBalance(undefined);
     setTermsAccepted(false);
     setError('');
   }
@@ -227,6 +255,7 @@ export function SubscriptionConsole() {
   function resetDraft() {
     setDraft({ accountId: crypto.randomUUID(), customerId: '', productId: '', productTermsVersionId: '', contractVersion: '1.0', investorNisba: '70', bankNisba: '30', currency: 'DZD' });
     setSubscription(undefined);
+    setSelectedBalance(undefined);
     setTermsAccepted(false);
     setDraftAttempted(false);
     setError('');
@@ -236,7 +265,23 @@ export function SubscriptionConsole() {
   async function run(work: (signal: AbortSignal) => Promise<InvestmentSubscription>, success: string, acceptedTerms = false) {
     await operations.current.run(work, {
       loading: () => { setBusy(true); setError(''); setMessage(''); },
-      success: (result) => { setSubscription(result); setTermsAccepted(acceptedTerms && result.status === 'PENDING_SUBSCRIPTION'); setMessage(success); },
+      success: (result) => {
+        setSubscription(result);
+        setDraft({
+          accountId: result.accountId,
+          customerId: result.customerId,
+          productId: result.productId,
+          productTermsVersionId: result.productTermsVersionId,
+          contractVersion: result.contractVersion,
+          investorNisba: result.investorNisba,
+          bankNisba: result.bankNisba,
+          currency: result.currency,
+        });
+        setSelectedBalance(isInvestmentSubscriptionBalance(result) ? result : undefined);
+        setTermsAccepted(isInvestmentSubscriptionBalance(result) ? result.termsAccepted : acceptedTerms && result.status === 'PENDING_SUBSCRIPTION');
+        setRegistryRevision((value) => value + 1);
+        setMessage(success);
+      },
       failure: setError,
       settled: () => setBusy(false),
     });
@@ -247,7 +292,10 @@ export function SubscriptionConsole() {
     setDraftAttempted(true);
     const validation = validateSubscriptionDraft(draft);
     if (validation) { setError(validation); return; }
-    await run((signal) => subscriptionCommand('', draft, signal), 'Pré-simulation créée. Vous pouvez démarrer le cycle de souscription.');
+    await run(async (signal) => {
+      const created = await subscriptionCommand('', draft, signal);
+      return getSubscription(created.accountId, signal);
+    }, 'Pré-simulation créée. Vous pouvez démarrer le cycle de souscription.');
   }
 
   async function transition(event: FormEvent<HTMLFormElement>) {
@@ -257,10 +305,26 @@ export function SubscriptionConsole() {
     const command = buildAction();
     const validation = validateSubscriptionAction(command);
     if (validation) { setError(validation); return; }
-    await run((signal) => subscriptionCommand(`/${encodeURIComponent(subscription.accountId)}/actions`, command, signal), `${actionLabels[selectedAction]} : transition enregistrée.`, selectedAction === 'ACCEPT');
+    await run(async (signal) => {
+      const transitioned = await subscriptionCommand(`/${encodeURIComponent(subscription.accountId)}/actions`, command, signal);
+      return getSubscription(transitioned.accountId, signal);
+    }, `${actionLabels[selectedAction]} : transition enregistrée.`, selectedAction === 'ACCEPT');
   }
 
-  return <div className={styles.grid} aria-busy={busy}>
+  async function resume(accountId: string) {
+    operations.current.invalidate();
+    await run((signal) => getSubscription(accountId, signal), 'Souscription chargée. Vous pouvez poursuivre les transitions autorisées.');
+    setDraftAttempted(false); setActionAttempted(false);
+    setAmount(''); setReason(''); setMaturityDate(''); setCaseReference('');
+  }
+
+  return <><section className={styles.card} aria-busy={registryLoading} aria-labelledby="subscriptions-registry-title">
+    <div className={styles.catalogHead}><div><p>Soldes comptabilisés</p><h2 id="subscriptions-registry-title">Souscriptions enregistrées</h2></div><button type="button" className={styles.secondary} disabled={registryLoading || busy} onClick={() => setRegistryRevision((value) => value + 1)}>Actualiser</button></div>
+    <label className={styles.field}>Rechercher un compte, client, produit ou statut<input type="search" value={registryQuery} onChange={(event) => setRegistryQuery(event.target.value)} placeholder="UUID, statut ou devise…" /></label>
+    {registryError && <p className={`${styles.notice} ${styles.error}`} role="alert">{registryError}</p>}
+    {!registryError && !registryLoading && visibleSubscriptions.length === 0 ? <p className={styles.hint}>Aucune souscription enregistrée ne correspond à la recherche.</p> : null}
+    {visibleSubscriptions.length > 0 ? <div className={styles.tableWrap} data-layout-scroll-region><table><thead><tr><th>Compte</th><th>Statut</th><th>Solde</th><th>Dépôts</th><th>Retraits</th><th><span className={styles.srOnly}>Action</span></th></tr></thead><tbody>{visibleSubscriptions.map((item) => <tr key={item.accountId} aria-selected={subscription?.accountId === item.accountId}><td className={styles.catalogId}>{item.accountId}</td><td><span className={styles.badge}>{item.status}</span></td><td>{item.balance} {item.currency}</td><td>{item.totalDeposits} {item.currency}</td><td>{item.totalWithdrawals} {item.currency}</td><td><button type="button" className={styles.secondary} disabled={busy} onClick={() => void resume(item.accountId)}>Ouvrir</button></td></tr>)}</tbody></table></div> : null}
+  </section><div className={styles.grid} aria-busy={busy}>
     <section className={styles.card} aria-labelledby="subscription-create-title">
       <h2 id="subscription-create-title">Nouvelle souscription</h2>
       <form className={styles.form} onSubmit={create} noValidate>
@@ -288,6 +352,7 @@ export function SubscriptionConsole() {
       <h2 id="subscription-lifecycle-title">Cycle de vie</h2>
       {subscription ? <>
         <p role="status">État actuel : <span className={styles.badge}>{subscription.status}</span></p>
+        {selectedBalance ? <dl className={styles.product}><dt>Solde comptabilisé</dt><dd>{selectedBalance.balance} {selectedBalance.currency}</dd><dt>Total des dépôts</dt><dd>{selectedBalance.totalDeposits} {selectedBalance.currency}</dd><dt>Total des retraits</dt><dd>{selectedBalance.totalWithdrawals} {selectedBalance.currency}</dd></dl> : null}
         {availableActions.length > 0 ? <form className={styles.form} onSubmit={transition}>
           <label className={styles.field}>Transition autorisée<select disabled={busy} value={selectedAction} onChange={(event) => { setActionType(event.target.value); setActionAttempted(false); }}>{availableActions.map((value) => <option key={value} value={value}>{actionLabels[value]}</option>)}</select></label>
           {['DEPOSIT', 'WITHDRAW'].includes(selectedAction) && <label className={styles.field}>Montant<input id="subscription-action-amount" required disabled={busy} inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} {...errorProps('subscription-action-amount', visibleActionError('amount'))} /><FieldError id="subscription-action-amount">{visibleActionError('amount')}</FieldError></label>}
@@ -299,7 +364,7 @@ export function SubscriptionConsole() {
         </form> : <p className={styles.hint}>Ce cycle est terminé ; aucune transition supplémentaire n’est disponible.</p>}
       </> : <p className={styles.hint}>Créez la pré-simulation avant toute transition.</p>}
     </section>
-  </div>;
+  </div></>;
 }
 
 export function Identifier({ id, label, value, error, disabled, onChange }: { id: string; label: string; value: string; error?: string; disabled: boolean; onChange: (value: string) => void }) {

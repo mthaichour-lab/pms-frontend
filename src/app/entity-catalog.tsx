@@ -3,9 +3,9 @@
 import { useEffect, useId, useState } from "react";
 import styles from "./products/products.module.css";
 
-export type CatalogKind = "products" | "customers" | "investment-pools";
+export type CatalogKind = "products" | "customers" | "investment-pools" | "assets" | "currencies";
 export type CatalogItem = { readonly id: string; readonly label: string; readonly detail: string; readonly status: string };
-const titles: Record<CatalogKind, string> = { products: "Produits disponibles", customers: "Clients disponibles", "investment-pools": "Pools disponibles" };
+const titles: Record<CatalogKind, string> = { products: "Produits disponibles", customers: "Clients disponibles", "investment-pools": "Pools disponibles", assets: "Actifs disponibles", currencies: "Devises disponibles" };
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 
 export function catalogPayload(kind: CatalogKind, value: unknown): readonly CatalogItem[] {
@@ -17,6 +17,8 @@ export function catalogPayload(kind: CatalogKind, value: unknown): readonly Cata
     if (kind === "products" && typeof row.productId === "string" && typeof row.code === "string" && typeof row.name === "string" && typeof row.status === "string") return { id: row.productId, label: row.code, detail: row.name, status: row.status };
     if (kind === "customers" && typeof row.customerId === "string" && typeof row.segment === "string" && typeof row.kycStatus === "string") return { id: row.customerId, label: `Client ${row.customerId}`, detail: row.segment, status: row.kycStatus };
     if (kind === "investment-pools" && typeof row.poolId === "string" && typeof row.displayName === "string" && typeof row.currency === "string" && typeof row.status === "string") return { id: row.poolId, label: row.poolId, detail: `${row.displayName} · ${row.currency}`, status: row.status };
+    if (kind === "assets" && typeof row.assetId === "string" && typeof row.assetCode === "string" && typeof row.currency === "string" && typeof row.outstandingAmount === "string") return { id: row.assetId, label: row.assetCode, detail: `${row.outstandingAmount} ${row.currency}`, status: typeof row.financingType === "string" ? row.financingType : "ACTIF" };
+    if (kind === "currencies" && typeof row.code === "string" && typeof row.name === "string" && typeof row.fractionDigits === "number" && typeof row.validFrom === "string") return { id: row.code, label: row.code, detail: `${row.name} · ${row.fractionDigits} décimale${row.fractionDigits > 1 ? "s" : ""}`, status: row.validUntil ? `Jusqu’au ${row.validUntil}` : `En vigueur depuis ${row.validFrom}` };
     throw new Error("Entrée du catalogue invalide.");
   });
 }

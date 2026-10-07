@@ -5,12 +5,12 @@ import { ExclusiveProductOperation, LatestProductRead } from './async-operation'
 import type { InvestmentProduct, ProductTerms, ProductTermsSimulation } from './product-api';
 import { isExactNisba, validProductCode, validProductId, validProductJustification, validProductName } from './product-api';
 import { ProductReferencesPanel } from './product-references-panel';
-import { EntityCatalog } from '../entity-catalog';
+import { EntityCatalog, notifyCatalogChanged } from '../entity-catalog';
 import styles from './products.module.css';
 
 type Tab = 'product' | 'terms' | 'references';
 export type ProductAction = 'validate' | 'publish' | 'suspend' | 'resume' | 'close';
-const productActionLabels: Record<ProductAction, string> = { validate: 'Valider', publish: 'Publier', suspend: 'Suspendre', resume: 'Réactiver', close: 'Supprimer / archiver' };
+const productActionLabels: Record<ProductAction, string> = { validate: 'Valider', publish: 'Publier', suspend: 'Suspendre', resume: 'Réactiver', close: 'Clôturer / archiver' };
 
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 export async function productRequestForConsole<T>(path: string, init: RequestInit, validate: (value: unknown) => value is T): Promise<T> {
@@ -19,7 +19,7 @@ export async function productRequestForConsole<T>(path: string, init: RequestIni
   if (!response.ok) throw new Error(`${detail} (référence : ${reference})`); if (!validate(payload)) throw new Error(`Réponse produit invalide. (référence : ${reference})`); return payload;
 }
 const isProductPayload = (value: unknown): value is InvestmentProduct => isRecord(value) && typeof value.productId === 'string' && value.productId.trim().length > 0 && typeof value.code === 'string' && value.code.trim().length > 0 && typeof value.name === 'string' && value.name.trim().length > 0 && typeof value.investorNisba === 'string' && typeof value.bankNisba === 'string' && typeof value.status === 'string';
-const isProductSimulationPayload = (value: unknown): value is ProductTermsSimulation => isRecord(value) && value.valid === true && typeof value.simulationChecksumSha256 === 'string' && value.simulationChecksumSha256.length === 64 && typeof value.notice === 'string';
+const isProductSimulationPayload = (value: unknown): value is ProductTermsSimulation => isRecord(value) && typeof value.valid === 'boolean' && typeof value.simulationChecksumSha256 === 'string' && value.simulationChecksumSha256.length === 64 && typeof value.notice === 'string';
 const isProductTermsPayload = (value: unknown): value is ProductTerms => isRecord(value) && typeof value.termsVersionId === 'string' && typeof value.productId === 'string' && typeof value.version === 'number' && typeof value.effectiveFrom === 'string' && typeof value.status === 'string';
 const isTermsPayload = (value: unknown): value is ProductTerms | ProductTermsSimulation => isProductTermsPayload(value) || isProductSimulationPayload(value);
 
@@ -92,6 +92,8 @@ export function ProductsConsole() {
     reads.current!.cancel();
     setProductId(value.trim());
     setProduct(undefined);
+    setSimulation(undefined);
+    setTerms(undefined);
     setBusy(commands.current!.isActive());
     setError('');
     setMessage('');
@@ -119,7 +121,7 @@ export function ProductsConsole() {
     await runCommand(
       (signal) => productRequestForConsole('', { method: 'POST', body: JSON.stringify(command), signal }, isProductPayload),
       'Produit créé en brouillon.',
-      (value) => { setProduct(value); setProductId(value.productId); setJustification(''); },
+      (value) => { setProduct(value); setProductId(value.productId); setJustification(''); notifyCatalogChanged('products'); },
     );
   }
 
@@ -134,7 +136,7 @@ export function ProductsConsole() {
     await runCommand(
       (signal) => productRequestForConsole(`/${encodeURIComponent(requestedProductId)}/${action}`, { method: 'POST', body: JSON.stringify({ justification: justification.trim() }), signal }, isProductPayload),
       `Transition ${action} enregistrée.`,
-      (value) => { setProduct(value); setJustification(''); },
+      (value) => { setProduct(value); setJustification(''); notifyCatalogChanged('products'); },
     );
   }
 
@@ -148,7 +150,10 @@ export function ProductsConsole() {
     await runCommand(
       (signal) => productRequestForConsole(path, { method: 'POST', body: JSON.stringify(command), signal }, isTermsPayload),
       mode === 'simulate' ? 'Simulation réussie. Son empreinte peut maintenant être publiée.' : 'Version contractuelle créée en brouillon.',
-      (value) => mode === 'simulate' ? setSimulation(value as ProductTermsSimulation) : setTerms(value as ProductTerms),
+      (value) => {
+        if (mode === 'simulate') { setSimulation(value as ProductTermsSimulation); setTerms(undefined); }
+        else setTerms(value as ProductTerms);
+      },
     );
   }
 
@@ -201,13 +206,13 @@ function TermsPanel({ busy, defaultProductId, simulation, terms, onSubmit, onPub
     <div className={styles.actions}><button className={styles.button} disabled={busy}>Simuler</button><button className={`${styles.button} ${styles.secondary}`} disabled={busy} type="button" onClick={(event) => void onSubmit(event.currentTarget.form!, 'draft')}>Créer le brouillon</button></div>
   </form></section><section className={styles.card}><h2>Résultat et publication</h2>{!simulation && !terms ? <p className={styles.hint}>Lancez une simulation avant de publier une version contractuelle.</p> : null}{simulation ? <div className={styles.product}><span className={styles.badge}>{simulation.valid ? 'Simulation valide' : 'Simulation invalide'}</span><p>{simulation.notice}</p><p className={styles.checksum}>{simulation.simulationChecksumSha256}</p></div> : null}{terms ? <div className={styles.product}><span className={styles.badge}>{terms.status}</span><dl><dt>Version</dt><dd>{terms.version}</dd><dt>Début d’effet</dt><dd>{terms.effectiveFrom}</dd><dt>Fin d’effet</dt><dd>{terms.effectiveTo ?? 'Sans limite'}</dd></dl></div> : null}
     <form className={styles.form} onSubmit={(event) => { event.preventDefault(); void onPublish(event.currentTarget); }}>
-      <label className={styles.field}>Identifiant produit<input name="publishProductId" disabled={busy} required defaultValue={terms?.productId ?? defaultProductId} /></label>
-      <label className={styles.field}>Identifiant de version<input name="termsVersionId" disabled={busy} required defaultValue={terms?.termsVersionId} /></label>
-      <label className={styles.field}>Date métier<input name="businessDate" disabled={busy} type="date" required /></label>
-      <label className={styles.field}>Empreinte de simulation<input name="simulationChecksumSha256" disabled={busy} pattern="[0-9a-f]{64}" required defaultValue={simulation?.simulationChecksumSha256} /></label>
+      <label className={styles.field}>Identifiant produit<input name="publishProductId" readOnly disabled={busy} required value={terms?.productId ?? defaultProductId} /></label>
+      <label className={styles.field}>Identifiant de version<input name="termsVersionId" readOnly disabled={busy} required value={terms?.termsVersionId ?? ''} /></label>
+      <label className={styles.field}>Date métier<input name="businessDate" disabled={busy} type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
+      <label className={styles.field}>Empreinte de simulation<input name="simulationChecksumSha256" readOnly disabled={busy} pattern="[0-9a-f]{64}" required value={simulation?.simulationChecksumSha256 ?? ''} /></label>
       <label className={styles.field}>Approbation rétroactive (si nécessaire)<input name="retroactiveApprovalId" disabled={busy} /></label>
       <label className={styles.field}>Justification<textarea name="justification" disabled={busy} minLength={10} maxLength={1000} required /></label>
-      <button className={styles.button} disabled={busy || !simulation?.valid}>Publier la version</button>
+      <button className={styles.button} disabled={busy || !simulation?.valid || !terms || terms.status !== 'DRAFT'}>Publier la version</button>
     </form>
   </section></div>;
 }

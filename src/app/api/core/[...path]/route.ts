@@ -122,6 +122,21 @@ function catalogEntries(kind: CatalogKind, payload: unknown): CatalogEntry[] {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const requestedPath = (await context.params).path;
+  if (requestedPath.length === 1 && requestedPath[0] === 'currencies') {
+    const businessDate = request.nextUrl.searchParams.get('businessDate') ?? new Date().toISOString().slice(0, 10);
+    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
+    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
+    if (!isExactDate(businessDate) || !/^\d+$/.test(limit) || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || Number(limit) < 1 || Number(limit) > 100) {
+      return problem(400, 'Invalid currency reference query', correlationId(request));
+    }
+    return forwardCore(request, `reference-data/currencies?${new URLSearchParams({ businessDate, limit, offset })}`);
+  }
+  if (requestedPath.length === 1 && requestedPath[0] === 'assets') {
+    const limit = request.nextUrl.searchParams.get('limit') ?? '50';
+    const offset = request.nextUrl.searchParams.get('offset') ?? '0';
+    if (!/^\d+$/.test(limit) || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || Number(limit) < 1 || Number(limit) > 100) return problem(400, 'Invalid asset pagination', correlationId(request));
+    return forwardCore(request, `investment-pools/assets?${new URLSearchParams({ limit, offset })}`);
+  }
   if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
     const limit = request.nextUrl.searchParams.get('limit') ?? '50';
     const offset = request.nextUrl.searchParams.get('offset') ?? '0';
@@ -317,6 +332,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const requestedPath = (await context.params).path;
+  if (requestedPath.length === 1 && requestedPath[0] === 'currencies') {
+    const requestCorrelationId = request.headers.get('x-correlation-id') ?? crypto.randomUUID();
+    const body: unknown = await request.clone().json().catch(() => undefined);
+    if (!isCurrencyDefinition(body)) return problem(400, 'Invalid currency reference', requestCorrelationId);
+    return forwardCore(request, 'reference-data/currencies', 'POST', body);
+  }
   if (requestedPath.length === 1 && requestedPath[0] === 'calculations') {
     const requestCorrelationId = request.headers.get('x-correlation-id');
     if (!requestCorrelationId || !isUuid(requestCorrelationId)) return problem(400, 'Valid X-Correlation-Id is required', requestCorrelationId ?? crypto.randomUUID());
@@ -659,6 +680,16 @@ function isExactDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isCurrencyDefinition(value: unknown): value is { code: string; name: string; fractionDigits: number; validFrom: string; validUntil?: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const currency = value as Record<string, unknown>;
+  return typeof currency.code === 'string' && /^[A-Z]{3}$/.test(currency.code) &&
+    typeof currency.name === 'string' && currency.name.trim().length > 0 && currency.name.trim().length <= 120 &&
+    typeof currency.fractionDigits === 'number' && Number.isInteger(currency.fractionDigits) && currency.fractionDigits >= 0 && currency.fractionDigits <= 6 &&
+    typeof currency.validFrom === 'string' && isExactDate(currency.validFrom) &&
+    (currency.validUntil === undefined || typeof currency.validUntil === 'string' && isExactDate(currency.validUntil) && currency.validUntil > currency.validFrom);
 }
 function isAuditOutcome(value: string): value is 'SUCCESS' | 'DENIED' | 'FAILURE' {
   return value === 'SUCCESS' || value === 'DENIED' || value === 'FAILURE';

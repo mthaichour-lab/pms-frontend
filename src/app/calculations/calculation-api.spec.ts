@@ -3,7 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calculationRequest,
+  isCalculationDispatch,
+  isCalculationRunPage,
   profitExplanationRequest,
+  validCalculationDraft,
   validCalculationRunId,
   validExplanationIdentifiers,
   validJustification,
@@ -35,12 +38,21 @@ describe("calculation workflow validation", () => {
     expect(calculationActionForStatus()).toBeUndefined();
   });
 
+  it("validates calculation initiation and registry payloads", () => {
+    const runId = "8c86d06e-2c2e-4aac-93d7-465c338232d9";
+    expect(validCalculationDraft({ runId, poolId: "POOL_DZD", businessDate: "2026-08-29", rulesVersion: "rules-2026.1", runKind: "PARALLEL", participantBasis: { type: "ACTIVE_SUBSCRIPTIONS", weightBasis: "SUBSCRIPTION_LEDGER_BALANCE" } })).toBe(true);
+    expect(isCalculationDispatch({ runId, status: "DRAFT", dispatchStatus: "QUEUED" })).toBe(true);
+    expect(isCalculationRunPage({ items: [], total: 0 })).toBe(true);
+  });
+
   it("renders an accessible UUID lookup without a prompt-driven workflow", () => {
     const html = renderToStaticMarkup(createElement(CalculationsConsole));
     expect(html).toContain('aria-describedby="calculation-run-id-hint"');
     expect(html).toContain('aria-busy="false"');
     expect(html).toContain('aria-live="polite"');
     expect(html).not.toContain("window.prompt");
+    expect(html).toContain("Lancer un calcul");
+    expect(html).toContain("Historique des runs");
   });
 
   it("requests the selected explanation view through the BFF", async () => {

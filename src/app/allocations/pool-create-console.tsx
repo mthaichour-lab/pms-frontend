@@ -42,6 +42,7 @@ export async function createPool(command: CreateInvestmentPool, signal: AbortSig
 export function PoolCreateConsole() {
   const [pool, setPool] = useState<InvestmentPool>();
   const [selectedId, setSelectedId] = useState('');
+  const [currency, setCurrency] = useState('DZD');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -56,7 +57,7 @@ export function PoolCreateConsole() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const command: CreateInvestmentPool = {
-      poolId: String(data.get('poolId') ?? '').trim().toUpperCase(), displayName: String(data.get('displayName') ?? '').trim(), currency: String(data.get('currency') ?? ''), strategyCode: String(data.get('strategyCode') ?? '').trim(),
+      poolId: String(data.get('poolId') ?? '').trim().toUpperCase(), displayName: String(data.get('displayName') ?? '').trim(), currency, strategyCode: String(data.get('strategyCode') ?? '').trim(),
       validFrom: String(data.get('validFrom') ?? ''), ...(data.get('validUntil') ? { validUntil: String(data.get('validUntil')) } : {}), eligibleAssetCodes: splitAssetCodes(String(data.get('eligibleAssetCodes') ?? '')), mudaribProfitShare: String(data.get('mudaribProfitShare') ?? '').trim(),
     };
     const validation = validatePoolDraft(command);
@@ -99,7 +100,7 @@ export function PoolCreateConsole() {
       <section className={styles.card}><h2>Créer un pool</h2><form className={styles.form} onSubmit={create} noValidate>
         <label className={styles.field}>Code du pool<input name="poolId" required maxLength={32} disabled={busy} placeholder="Ex. POOL_IMMOBILIER" /></label>
         <label className={styles.field}>Nom du pool<input name="displayName" required disabled={busy} /></label>
-        <div className={styles.row}><label className={styles.field}>Devise<select name="currency" disabled={busy} defaultValue="DZD"><option>DZD</option><option>EUR</option><option>USD</option></select></label><label className={styles.field}>Code stratégie<input name="strategyCode" required disabled={busy} placeholder="Ex. DIVERSIFIED" /></label></div>
+        <div className={styles.row}><EntityCatalog compact label="Devise du pool" kind="currencies" selectedId={currency} disabled={busy} onSelect={setCurrency} /><label className={styles.field}>Code stratégie<input name="strategyCode" required disabled={busy} placeholder="Ex. DIVERSIFIED" /></label></div>
         <div className={styles.row}><label className={styles.field}>Date de début<input name="validFrom" type="date" required disabled={busy} defaultValue={new Date().toISOString().slice(0, 10)} /></label><label className={styles.field}>Date de fin (facultative)<input name="validUntil" type="date" disabled={busy} /></label></div>
         <label className={styles.field}>Actifs éligibles<textarea name="eligibleAssetCodes" disabled={busy} placeholder="Codes actifs séparés par une virgule" /></label>
         <label className={styles.field}>Part Moudarib (%)<input name="mudaribProfitShare" inputMode="decimal" defaultValue="30" required disabled={busy} /></label>

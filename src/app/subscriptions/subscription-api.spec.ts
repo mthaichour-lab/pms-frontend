@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createSubscription, transitionSubscription } from './subscription-api';
+import { createSubscription, getSubscription, isInvestmentSubscriptionBalance, listSubscriptions, subscriptionPage, transitionSubscription } from './subscription-api';
 import { actionsForStatus, Identifier, SubscriptionConsole, SubscriptionOperationCoordinator, SubscriptionOperationGate, subscriptionActionFieldErrors, subscriptionCommand, subscriptionDraftFieldErrors, validateSubscriptionAction, validateSubscriptionDraft } from './subscription-console';
 
 afterEach(() => vi.restoreAllMocks());
@@ -44,6 +44,23 @@ describe('subscription API', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ detail: 'Transition interdite', correlationId: 'corr-42' }), { status: 409 }));
     await expect(createSubscription(validDraft)).rejects.toThrow('Transition interdite (référence : corr-42)');
   });
+
+  it('loads persisted subscriptions and their ledger balances without a mock fallback', async () => {
+    const balanced = { ...subscription, balance: '1250.50', totalDeposits: '1500.50', totalWithdrawals: '250', termsAccepted: true };
+    const mock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [balanced], total: 1 })))
+      .mockResolvedValueOnce(new Response(JSON.stringify(balanced)));
+    await expect(listSubscriptions()).resolves.toEqual({ items: [balanced], total: 1 });
+    await expect(getSubscription(validDraft.accountId)).resolves.toEqual(balanced);
+    expect(mock.mock.calls[0]?.[0]).toBe('/api/core/investment-accounts/subscriptions?limit=100&offset=0');
+    expect(mock.mock.calls[1]?.[0]).toBe(`/api/core/investment-accounts/subscriptions/${validDraft.accountId}`);
+    expect(isInvestmentSubscriptionBalance({ ...balanced, balance: '-1' })).toBe(true);
+  });
+
+  it('rejects malformed subscription balance pages', () => {
+    expect(subscriptionPage({ items: [{ ...subscription, balance: '0' }], total: 1 })).toBe(false);
+    expect(subscriptionPage({ items: [], total: -1 })).toBe(false);
+  });
 });
 
 describe('subscription validation and lifecycle', () => {
@@ -53,6 +70,8 @@ describe('subscription validation and lifecycle', () => {
     expect(html).toContain('aria-busy="false"');
     expect(html).toContain('required=""');
     expect(html).toContain('Créez la pré-simulation avant toute transition.');
+    expect(html).toContain('Souscriptions enregistrées');
+    expect(html).toContain('Soldes comptabilisés');
   });
 
   it('validates identifiers, currency and exact Nisba', () => {

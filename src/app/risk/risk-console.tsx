@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { dcrFieldValidity, validDcrCommand, type DcrCalculationCommand, type DcrCalculationResult } from './risk-api';
 import { RiskError, RiskStatus } from './risk-feedback';
 import styles from '../products/products.module.css';
+import { EntityCatalog } from '../entity-catalog';
 
 const empty: DcrCalculationCommand = {
   poolId: '',
@@ -44,6 +45,7 @@ export function RiskConsole() {
   const validity = dcrFieldValidity(command);
   const invalid = (field: keyof typeof validity) => validationAttempted && !validity[field];
   const change = (key: keyof DcrCalculationCommand, value: string) => setCommand((current) => ({ ...current, [key]: value }));
+  function selectPool(poolId: string) { setCommand((current) => ({ ...current, poolId })); setResult(undefined); setError(''); setMessage(''); }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +68,7 @@ export function RiskConsole() {
     );
   }
 
-  return <div className={styles.grid} aria-busy={busy}>
+  return <><EntityCatalog compact kind="investment-pools" label="Pool pour le calcul DCR" selectedId={command.poolId} disabled={busy} onSelect={selectPool} /><div className={styles.grid} aria-busy={busy}>
     <section className={styles.card} aria-labelledby="dcr-form-title">
       <h2 id="dcr-form-title">Calcul du DCR</h2>
       <form className={styles.form} onSubmit={submit} noValidate>
@@ -101,5 +103,5 @@ export function RiskConsole() {
       <h2 id="dcr-result-title">Résultat traçable</h2>
       {result ? <div className={styles.product}><span className={styles.badge}>{result.state}</span><dl><dt>DCR</dt><dd>{result.value}</dd><dt>Seuil</dt><dd>{result.threshold}</dd><dt>Calcul</dt><dd>{result.dcrCalculationId}</dd></dl></div> : <p className={styles.hint}>Le résultat et son identifiant de preuve apparaîtront après calcul par le moteur backend.</p>}
     </section>
-  </div>;
+  </div></>;
 }

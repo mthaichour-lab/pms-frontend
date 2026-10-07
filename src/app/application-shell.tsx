@@ -27,7 +27,7 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [dashboard, setDashboard] = useState<AudienceDashboard>();
-  const [dashboardState, setDashboardState] = useState<"loading" | "certified" | "demo" | "error">("loading");
+  const [dashboardState, setDashboardState] = useState<"loading" | "certified" | "error">("loading");
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('monthly');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const t = getMessages(locale);
@@ -58,12 +58,14 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
       { label: t.reconciliation, icon: "reconciliation" as const, href: "/reconciliation" },
       { label: "Exceptions", icon: "exception" as const, href: "/exceptions" },
       { label: "Qualité CBS", icon: "quality" as const, href: "/cbs-quality" },
-      { label: "Protection des données", icon: "privacy" as const, href: "/data-protection" },
     ] },
     { label: t.restitution, items: [
       { label: t.reporting, icon: "report" as const, href: "/reporting" },
       { label: t.audit, icon: "audit" as const, href: "/audit" },
-      { label: "Utilisateurs et rôles", icon: "users" as const, href: "/users" },
+    ] },
+    { label: "Administration", items: [
+      { label: "Référentiel devises", icon: "database" as const, href: "/reference-data" },
+      { label: "Profils, rôles et privilèges", icon: "users" as const, href: "/users" },
     ] },
   ];
   const visibleNavGroups = useMemo(() => {
@@ -74,10 +76,10 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
       .filter((group) => group.items.length > 0);
   }, [locale, query, roles]);
   const fallbackKpis = [
-    { label: t.outstanding, value: "18,42 Md DZD", detail: "+4,8 % sur la période", icon: "database" as const },
-    { label: t.distributable, value: "327,6 M DZD", detail: "+4,1 % sur la période", icon: "trend" as const },
-    { label: t.portfolioDcr, value: "1,24×", detail: t.threshold, icon: "pie" as const },
-    { label: t.actions, value: "7", detail: t.controls, warning: true, icon: "tasks" as const },
+    { label: t.outstanding, value: "—", detail: "En attente des données certifiées", icon: "database" as const },
+    { label: t.distributable, value: "—", detail: "En attente des données certifiées", icon: "trend" as const },
+    { label: t.portfolioDcr, value: "—", detail: "En attente des données certifiées", icon: "pie" as const },
+    { label: t.actions, value: "—", detail: "En attente des données certifiées", warning: true, icon: "tasks" as const },
   ];
   const displayedKpis = dashboard?.items.slice(0, 4).map((item, index) => ({
     label: dashboardItemLabel(item), value: dashboardItemValue(item), icon: fallbackKpis[index]?.icon ?? "trend" as const,
@@ -86,14 +88,13 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
   })) ?? fallbackKpis;
   const dashboardDetail = dashboardState === "certified" && dashboard
     ? `Situation au ${dashboard.businessDate ?? dashboard.generatedAt.slice(0, 10)} · ${Math.round(dashboard.queryDurationMs)} ms`
-    : dashboardState === "demo" ? `${t.consolidatedAt} · mode démonstration`
-    : dashboardState === "error" ? "Indicateurs certifiés indisponibles. Vérifiez la connectivité puis réessayez."
+    : dashboardState === "error" ? "Indicateurs certifiés indisponibles ou non autorisés pour ce profil."
     : "Chargement des indicateurs certifiés…";
   const chart = dashboardChartData(chartPeriod);
 
   useEffect(() => {
     const audience = audienceForRoles(roles);
-    if (!audience) { setDashboardState("demo"); return; }
+    if (!audience) { setDashboard(undefined); setDashboardState("error"); return; }
     const controller = new AbortController();
     loadAudienceDashboard(audience, undefined, { signal: controller.signal })
       .then((result) => { if (!controller.signal.aborted) { setDashboard(result); setDashboardState("certified"); } })
@@ -138,7 +139,7 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
     <div className={`${styles.content} ${shell.content}`}>
       <header className={`${styles.topbar} ${shell.topbar}`}>
         <button className={`${styles.menu} ${shell.menu}`} type="button" aria-label={open ? t.closeNav : t.openNav} aria-controls="primary-navigation" aria-expanded={open} onClick={() => setOpen((current) => !current)}>☰</button>
-        <label className={styles.search}><UiIcon name="search" /><span className={styles.srOnly}>Rechercher un module</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un produit, un client, une allocation…" /></label>
+        <label className={styles.search}><UiIcon name="search" /><span className={styles.srOnly}>Rechercher un module</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un module…" /></label>
         <div className={styles.notificationArea}><button className={styles.iconButton} type="button" aria-label="Notifications" aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((current) => !current)}><UiIcon name="bell" /><i aria-hidden /></button>{notificationsOpen ? <div className={styles.notificationMenu} role="dialog" aria-label="Notifications"><strong>Notifications</strong><p>Aucune notification prioritaire.</p><button type="button" onClick={() => setNotificationsOpen(false)}>Fermer</button></div> : null}</div>
         <label className={`${styles.language} ${shell.language}`}><span className={styles.srOnly}>{t.language}</span><select id="application-locale" aria-label={t.language} value={locale} onChange={(event) => changeLocale(event.target.value)}>{supportedLocales.map((code) => <option key={code} value={code}>{getMessages(code).localeName}</option>)}</select></label>
         <span className={`${styles.status} ${shell.status}`}>{t.operational}</span>
@@ -159,16 +160,15 @@ export function ApplicationShell({ userName, roles, locale }: Props) {
             <div className={styles.chartArea}><div className={styles.axis} aria-hidden><span>400 M</span><span>300 M</span><span>200 M</span><span>100 M</span><span>0</span></div><div className={styles.bars} style={{ gridTemplateColumns: `repeat(${chart.points.length}, minmax(1.5rem, 1fr))` }} role="img" aria-label={`${t.chartLabel} · vue ${chartPeriod === 'monthly' ? 'mensuelle' : 'annuelle'}`}>{chart.points.map(({ label, income, distributed }) => <div className={styles.barColumn} key={label}><div className={styles.barItem}><i className={styles.bar} style={{ height: `${income}%` }} /><i className={styles.barAlt} style={{ height: `${distributed}%` }} /></div><span>{label}</span></div>)}</div></div>
             <div className={styles.legend}><span><b />{t.revenues}</span><span><b />{t.distributed}</span></div>
           </article>
-          <aside className={`${styles.panel} ${styles.queuePanel}`} aria-labelledby="work-queue-title"><div className={styles.cardTitle}><div><p>Contrôles</p><h2 id="work-queue-title">{t.workQueue}</h2></div>{canAccessNavigationRoute("/exceptions", roles) ? <a href="/exceptions">Voir tout</a> : null}</div><ul className={styles.tasks}>{canAccessNavigationRoute("/calculations", roles) ? <Task title={t.task1} detail={t.task1Detail} value="12" href="/calculations" tone="positive" /> : null}{canAccessNavigationRoute("/reconciliation", roles) ? <Task title={t.task2} detail={t.task2Detail} value="3" href="/reconciliation" tone="negative" /> : null}{canAccessNavigationRoute("/subscriptions", roles) ? <Task title="Souscriptions à valider" detail="Contrats en attente" value="8" href="/subscriptions" /> : null}{canAccessNavigationRoute("/allocations", roles) ? <Task title="Allocations en attente" detail="Capacité à confirmer" value="5" href="/allocations" /> : null}{canAccessNavigationRoute("/reporting", roles) ? <Task title={t.task3} detail={t.task3Detail} value="6" href="/reporting" /> : null}</ul></aside>
+          <aside className={`${styles.panel} ${styles.queuePanel}`} aria-labelledby="work-queue-title"><div className={styles.cardTitle}><div><p>Accès rapide</p><h2 id="work-queue-title">{t.workQueue}</h2></div>{canAccessNavigationRoute("/exceptions", roles) ? <a href="/exceptions">Voir tout</a> : null}</div><ul className={styles.tasks}>{canAccessNavigationRoute("/calculations", roles) ? <Task title={t.task1} detail={t.task1Detail} value="Ouvrir" href="/calculations" tone="positive" /> : null}{canAccessNavigationRoute("/reconciliation", roles) ? <Task title={t.task2} detail={t.task2Detail} value="Ouvrir" href="/reconciliation" tone="negative" /> : null}{canAccessNavigationRoute("/subscriptions", roles) ? <Task title="Souscriptions" detail="Consulter les comptes et leurs soldes" value="Ouvrir" href="/subscriptions" /> : null}{canAccessNavigationRoute("/allocations", roles) ? <Task title="Allocations" detail="Simuler et enregistrer une allocation" value="Ouvrir" href="/allocations" /> : null}{canAccessNavigationRoute("/reporting", roles) ? <Task title={t.task3} detail={t.task3Detail} value="Ouvrir" href="/reporting" /> : null}</ul></aside>
         </section>
-        <section className={`${styles.panel} ${styles.workflowPanel}`} aria-labelledby="workflow-title"><div className={styles.cardTitle}><div><p>Activité récente</p><h2 id="workflow-title">Derniers workflows PMS</h2></div>{canAccessNavigationRoute("/audit", roles) ? <a href="/audit">Voir la piste d’audit</a> : null}</div><div className={styles.tableWrap}><table><thead><tr><th>Date</th><th>Type</th><th>Objet</th><th>Montant / encours</th><th>Statut</th><th>Assigné</th></tr></thead><tbody><WorkflowRow date="29/08/2026 · 10:24" type="Allocation" reference="TRF-ALLOC-20260829-001" amount="250,0 M DZD" status="En contrôle" owner="N. Benali" /><WorkflowRow date="29/08/2026 · 09:17" type="Souscription" reference="SUB-20260829-1783" amount="12,5 M DZD" status="À valider" owner="S. Moreau" tone="warning" /><WorkflowRow date="28/08/2026 · 16:42" type="Calcul" reference="CALC-20260828-7712" amount="—" status="Terminé" owner="M. Diallo" /><WorkflowRow date="28/08/2026 · 11:06" type="Réconciliation" reference="REC-20260828-4410" amount="18,7 M DZD" status="Écart détecté" owner="A. Bernard" tone="negative" /></tbody></table></div></section>
+        <section className={`${styles.panel} ${styles.workflowPanel}`} aria-labelledby="workflow-title"><div className={styles.cardTitle}><div><p>Traçabilité</p><h2 id="workflow-title">Activité PMS certifiée</h2></div>{canAccessNavigationRoute("/audit", roles) ? <a href="/audit">Ouvrir la piste d’audit</a> : null}</div><p className={styles.navEmpty}>Consultez la piste d’audit pour afficher les opérations réellement enregistrées. Aucun événement de démonstration n’est injecté dans cette vue.</p></section>
       </main>
     </div>
   </div>;
 }
 
 function Task({ title, detail, value, href, tone = "neutral" }: { title: string; detail: string; value: string; href: string; tone?: "neutral" | "positive" | "negative" }) { return <li className={styles.task}><span className={`${styles.taskMark} ${styles[tone]}`} aria-hidden><UiIcon name="tasks" /></span><div><strong>{title}</strong><small>{detail}</small></div><b>{value}</b><a href={href} aria-label={`Ouvrir ${title}`}><UiIcon name="arrow" /></a></li>; }
-function WorkflowRow({ date, type, reference, amount, status, owner, tone = "positive" }: { date: string; type: string; reference: string; amount: string; status: string; owner: string; tone?: "positive" | "warning" | "negative" }) { return <tr><td>{date}</td><td>{type}</td><td>{reference}</td><td>{amount}</td><td><span className={`${styles.workflowStatus} ${styles[tone]}`}><i aria-hidden />{status}</span></td><td>{owner}</td></tr>; }
 export function BrandMark() { return <svg viewBox="0 0 32 32" aria-hidden><path d="M5 14 16 5l11 9v13h-7V17h-8v10H5Z" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/><path d="M10 11v-4m6 1V3m6 8V7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>; }
 export function UiIcon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {

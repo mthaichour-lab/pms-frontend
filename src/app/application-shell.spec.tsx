@@ -32,6 +32,14 @@ describe('application shell navigation', () => {
     expect(html).not.toContain('href="/risk"');
   });
 
+  it('shows profile administration to administrators without exposing data protection in navigation', () => {
+    const html = render(['SYSTEM_ADMIN']);
+    expect(html).toContain('Administration');
+    expect(html).toContain('Profils, rôles et privilèges');
+    expect(html).toContain('href="/users"');
+    expect(html).not.toContain('href="/data-protection"');
+  });
+
   it('renders the selected locale direction and RTL flow arrow', () => {
     const html = render(['FINANCE_CONTROLLER'], 'ar');
     expect(html).toContain('lang="ar"');

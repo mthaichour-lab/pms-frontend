@@ -17,8 +17,8 @@ describe('workspace frame', () => {
   it('renders the persistent navigation and the test database status', () => {
     const html = render();
     expect(html).toContain('id="primary-navigation"');
-    expect(html).toContain('Base de données simulée active');
-    expect(html).toContain('12 produits');
+    expect(html).toContain('Environnement Docker local');
+    expect(html).toContain('Aucun fallback silencieux');
     expect(html).toContain('Contenu métier');
   });
 
@@ -34,5 +34,13 @@ describe('workspace frame', () => {
     expect(html).toContain('href="/customers"');
     expect(html).not.toContain('href="/risk"');
     expect(html).not.toContain('href="/audit"');
+  });
+
+  it('keeps profile administration visible to administrators and removes data protection from the sidebar', () => {
+    const html = render(['SYSTEM_ADMIN']);
+    expect(html).toContain('Administration');
+    expect(html).toContain('Profils, rôles et privilèges');
+    expect(html).toContain('href="/users"');
+    expect(html).not.toContain('href="/data-protection"');
   });
 });

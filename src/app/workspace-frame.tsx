@@ -55,12 +55,14 @@ export function WorkspaceFrame({ children, userName, roles, locale }: WorkspaceF
       { label: t.reconciliation, icon: "reconciliation", href: "/reconciliation" },
       { label: "Exceptions", icon: "exception", href: "/exceptions" },
       { label: "Qualité CBS", icon: "quality", href: "/cbs-quality" },
-      { label: "Protection des données", icon: "privacy", href: "/data-protection" },
     ] },
     { label: t.restitution, items: [
       { label: t.reporting, icon: "report", href: "/reporting" },
       { label: t.audit, icon: "audit", href: "/audit" },
-      { label: "Utilisateurs et rôles", icon: "users", href: "/users" },
+    ] },
+    { label: "Administration", items: [
+      { label: "Référentiel devises", icon: "database", href: "/reference-data" },
+      { label: "Profils, rôles et privilèges", icon: "users", href: "/users" },
     ] },
   ] satisfies readonly { label: string; items: readonly NavigationItem[] }[], [t]);
 
@@ -107,13 +109,13 @@ export function WorkspaceFrame({ children, userName, roles, locale }: WorkspaceF
     <div className={`${styles.content} ${shell.content}`}>
       <header className={`${styles.topbar} ${shell.topbar}`}>
         <button className={`${styles.menu} ${shell.menu}`} type="button" aria-label={open ? t.closeNav : t.openNav} aria-controls="primary-navigation" aria-expanded={open} onClick={() => setOpen((current) => !current)}>☰</button>
-        <label className={styles.search}><UiIcon name="search" /><span className={styles.srOnly}>Rechercher un module</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un produit, un client, une allocation…" /></label>
+        <label className={styles.search}><UiIcon name="search" /><span className={styles.srOnly}>Rechercher un module</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un module…" /></label>
         <div className={styles.notificationArea}><button className={styles.iconButton} type="button" aria-label="Notifications" aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((current) => !current)}><UiIcon name="bell" /><i aria-hidden /></button>{notificationsOpen ? <div className={styles.notificationMenu} role="dialog" aria-label="Notifications"><strong>Notifications</strong><p>Aucune notification prioritaire.</p><button type="button" onClick={() => setNotificationsOpen(false)}>Fermer</button></div> : null}</div>
         <label className={`${styles.language} ${shell.language}`}><span className={styles.srOnly}>{t.language}</span><select id="application-locale" aria-label={t.language} value={locale} onChange={(event) => changeLocale(event.target.value)}>{supportedLocales.map((code) => <option key={code} value={code}>{getMessages(code).localeName}</option>)}</select></label>
         <span className={`${styles.status} ${shell.status}`}>{t.operational}</span>
         <div className={styles.topProfile}><span className={styles.avatar} aria-hidden>{initials(displayName)}</span><div><strong>{displayName}</strong><small>{role}</small></div></div>
       </header>
-      <div className={frame.demoBar} role="status"><span><i aria-hidden />Base de données simulée active</span><b>12 produits</b><b>8 clients</b><b>3 pools</b><b>18 opérations</b></div>
+      <div className={frame.demoBar} role="status"><span><i aria-hidden />Environnement Docker local</span><b>Données réelles de la base locale</b><b>Aucun fallback silencieux</b></div>
       <div id="main-content" className={frame.routeContent}>{children}</div>
     </div>
   </div>;

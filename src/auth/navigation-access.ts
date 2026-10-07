@@ -2,6 +2,7 @@ import type { PmsRole } from './roles';
 
 const accessByRoute: Readonly<Record<string, readonly PmsRole[]>> = {
   '/users': ['SYSTEM_ADMIN'],
+  '/reference-data': ['SYSTEM_ADMIN'],
   '/closings': ['FINANCE_CONTROLLER', 'SYSTEM_ADMIN'],
   '/opening-balances': ['FINANCE_CONTROLLER', 'SYSTEM_ADMIN'],
   '/products': ['FINANCE_ANALYST', 'FINANCE_CONTROLLER', 'SHARIA_AUDITOR', 'SYSTEM_ADMIN'],

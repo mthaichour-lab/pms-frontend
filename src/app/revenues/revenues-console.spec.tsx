@@ -16,4 +16,10 @@ describe('revenues console accessibility contract', () => {
     expect(html).toContain('Évaluer les charges');
     expect(html).toContain('Importer');
   });
+
+  it('offers controlled pool and asset selectors for a new recognized income', () => {
+    const html = renderToStaticMarkup(createElement(RevenuesConsole));
+    expect(html).toContain('Pools disponibles');
+    expect(html).toContain('Actif source du revenu');
+  });
 });

@@ -4,6 +4,7 @@ import { createPlanningScenario, planningScenarioFieldValidity, transitionPlanni
 import { ExclusiveOperationManager } from './async-operation';
 import { ReportingError, ReportingStatus } from './reporting-feedback';
 import styles from '../products/products.module.css';
+import { EntityCatalog } from '../entity-catalog';
 
 const nextStatus = { DRAFT: 'SUBMITTED', SUBMITTED: 'VALIDATED', VALIDATED: 'OFFICIAL_BUDGET' } as const;
 export function nextPlanningScenarioStatus(status: string): string | undefined { return nextStatus[status as keyof typeof nextStatus]; }
@@ -46,7 +47,7 @@ export function PlanningScenarioConsole() {
 
   const next = scenario ? nextPlanningScenarioStatus(scenario.status) : undefined;
   const decimalHint = 'Nombre décimal fini, avec un point comme séparateur.';
-  return <section className={styles.card} aria-busy={busy} aria-labelledby="planning-scenario-title">
+  return <><EntityCatalog compact kind="investment-pools" label="Pool du scénario" selectedId={poolId} disabled={busy} onSelect={(value) => { setPoolId(value); invalidateScenario(); }} /><section className={styles.card} aria-busy={busy} aria-labelledby="planning-scenario-title">
     <h2 id="planning-scenario-title">Scénario budgétaire à 12 mois</h2>
     <form className={styles.form} onSubmit={create} noValidate><fieldset disabled={busy}>
       <label className={styles.field}>Pool<input value={poolId} onChange={(event) => { setPoolId(event.target.value); invalidateScenario(); }} required minLength={2} maxLength={64} autoComplete="off" spellCheck={false} aria-invalid={attempted && !validity.poolId} aria-describedby="planning-pool-hint" /></label><p id="planning-pool-hint" className={styles.hint}>2 à 64 caractères autorisés : lettres, chiffres, point, tiret, deux-points ou soulignement.</p>
@@ -60,5 +61,5 @@ export function PlanningScenarioConsole() {
     </fieldset></form>
     <ReportingError message={error} /><ReportingStatus message={message} />
     {scenario && <article className={styles.product} aria-label={`Scénario ${scenario.scenarioId}`}><span className={styles.badge}>{scenario.status}</span><p className={styles.checksum}>{scenario.scenarioId}</p>{next && <button className={styles.button} type="button" disabled={busy || !scenario.scenarioId} onClick={() => void advance()}>Passer au statut {next}</button>}</article>}
-  </section>;
+  </section></>;
 }
