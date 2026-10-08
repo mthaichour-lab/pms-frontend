@@ -53,6 +53,16 @@ if (unauthenticatedResponse.status !== 401) {
   throw new Error(`Catalog without session returned ${unauthenticatedResponse.status}, expected 401`);
 }
 
+const quotation = await postResource("simulations", {
+  placementAmount: "1000000",
+  targetNetRatePercent: "0.5",
+  basis: { type: "GLOBAL_POOL" },
+});
+if (quotation.verdict !== "APPROVABLE" || Number(quotation.maximumBasisCapacity) < 1000000 ||
+    quotation.segregatedAccountingRequired !== false) {
+  throw new Error(`Quotation simulation returned an unexpected result: ${JSON.stringify(quotation)}`);
+}
+
 const customerId = randomUUID();
 const customer = await postResource("customers", {
   customerId,
@@ -196,6 +206,7 @@ console.log(
     event: "frontend.e2e.real_bff.passed",
     dependencies: ["nextjs-bff", "keycloak", "backend-api", "postgresql"],
     verifiedCatalogs: catalogs.length,
+    verifiedQuotationSimulation: true,
     verifiedCreations: 3,
     verifiedSubscriptionBalance: true,
     verifiedPoolActivation: true,
