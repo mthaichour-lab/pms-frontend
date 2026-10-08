@@ -8,3 +8,4 @@ coverage/
 !.env.compose.example
 !.env.local.example
 *.tsbuildinfo
+graphify-out/
