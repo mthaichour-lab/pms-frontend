@@ -53,21 +53,10 @@ jobs:
         env:
           PMS_BACKEND_CONTEXT: ${{ github.workspace }}/pms-backend
         run: |
-          set +e
-          run_step() {
-            out=$("$@" 2>&1)
-            rc=$?
-            if [ "$rc" -ne 0 ]; then
-              echo "::error::DIAG cmd[$*] rc=$rc out[$(printf '%s' "$out" | tail -c 1200 | tr '\n\r\t' '   ')]"
-              echo "::error::DIAG ls[$(ls -la pms-backend/*.tgz vendor/*.tgz 2>&1 | tr '\n' ' ')]"
-              echo "::error::DIAG sums[$(sha256sum pms-backend/bank-pms-api-client-1.0.0.tgz vendor/bank-pms-api-client-1.0.0.tgz pms-backend/contracts/openapi/pms-api.v1.json 2>&1 | tr '\n' ' ')]"
-              exit "$rc"
-            fi
-          }
-          run_step pnpm --dir pms-backend install --frozen-lockfile
-          run_step pnpm --dir pms-backend run sdk:pack
-          run_step pnpm run sdk:verify-provenance
-          run_step pnpm run migration:verify-readiness
+          pnpm --dir pms-backend install --frozen-lockfile
+          pnpm --dir pms-backend run sdk:pack
+          pnpm run sdk:verify-provenance
+          pnpm run migration:verify-readiness
       - name: Run authenticated frontend-to-backend integration
         env:
           PMS_FRONTEND_CONTEXT: ${{ github.workspace }}
@@ -76,10 +65,11 @@ jobs:
           RABBITMQ_PASSWORD: ci-rabbitmq-${{ github.run_id }}
           KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-${{ github.run_id }}
           KEYCLOAK_DEV_PASSWORD: ci-keycloak-user-${{ github.run_id }}
+          KEYCLOAK_ADMIN_CLIENT_SECRET: ci-keycloak-client-secret-${{ github.run_id }}
         run: |
           cp pms-backend/.env.local.example pms-backend/.env.local
           cp pms-backend/.env.compose.example pms-backend/.env.compose
-          printf '\nPOSTGRES_PASSWORD=%s\nRABBITMQ_PASSWORD=%s\nKEYCLOAK_ADMIN_PASSWORD=%s\nKEYCLOAK_DEV_PASSWORD=%s\n' "$POSTGRES_PASSWORD" "$RABBITMQ_PASSWORD" "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DEV_PASSWORD" >> pms-backend/.env.local
+          printf '\nPOSTGRES_PASSWORD=%s\nRABBITMQ_PASSWORD=%s\nKEYCLOAK_ADMIN_PASSWORD=%s\nKEYCLOAK_DEV_PASSWORD=%s\nKEYCLOAK_ADMIN_CLIENT_SECRET=%s\n' "$POSTGRES_PASSWORD" "$RABBITMQ_PASSWORD" "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DEV_PASSWORD" "$KEYCLOAK_ADMIN_CLIENT_SECRET" >> pms-backend/.env.local
           docker compose --project-directory pms-backend --env-file pms-backend/.env.local --env-file pms-backend/.env.compose -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed up --build --abort-on-container-exit --exit-code-from frontend-e2e frontend-e2e
       - name: Collect full-stack integration logs
         if: failure()

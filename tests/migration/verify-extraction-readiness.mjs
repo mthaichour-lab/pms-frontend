@@ -87,6 +87,9 @@ async function runtimeFiles(root) {
         [
           ".git",
           ".next",
+          // Third-party scanner caches (Trivy downloads Kubernetes policy
+          // bundles here in CI) are not project runtime files.
+          ".cache",
           "node_modules",
           "graphify-out",
           "docs",
