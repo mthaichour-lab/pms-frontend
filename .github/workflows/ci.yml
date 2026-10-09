@@ -111,14 +111,6 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           hide-progress: "true"
-      - name: Report image scan findings
-        if: failure()
-        run: |
-          if [ -f build-output/trivy-image.json ]; then
-            echo "::error::TRIVY $(jq -r '[.Results[]?.Vulnerabilities[]? | "\(.Severity) \(.VulnerabilityID) \(.PkgName) \(.InstalledVersion)->\(.FixedVersion // "none")"] | unique | join(" | ")' build-output/trivy-image.json | head -c 3000)"
-          else
-            echo "::error::TRIVY report missing"
-          fi
       - name: Export immutable image artifact
         run: |
           docker save pms-frontend:${{ github.sha }} --output build-output/pms-frontend.oci.tar
