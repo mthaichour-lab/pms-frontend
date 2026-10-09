@@ -69,7 +69,7 @@ jobs:
           cp pms-backend/.env.local.example pms-backend/.env.local
           cp pms-backend/.env.compose.example pms-backend/.env.compose
           printf '\nPOSTGRES_PASSWORD=%s\nRABBITMQ_PASSWORD=%s\nKEYCLOAK_ADMIN_PASSWORD=%s\nKEYCLOAK_DEV_PASSWORD=%s\n' "$POSTGRES_PASSWORD" "$RABBITMQ_PASSWORD" "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DEV_PASSWORD" >> pms-backend/.env.local
-          docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed up --build --abort-on-container-exit --exit-code-from frontend-e2e frontend-e2e
+          docker compose --project-directory pms-backend --env-file pms-backend/.env.local --env-file pms-backend/.env.compose -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed up --build --abort-on-container-exit --exit-code-from frontend-e2e frontend-e2e
       - name: Collect full-stack integration logs
         if: failure()
         env:
@@ -77,7 +77,7 @@ jobs:
           NEXTAUTH_SECRET: ci-nextauth-${{ github.run_id }}-at-least-32-characters
         run: |
           if [ -f pms-backend/.env.local ]; then
-            docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed logs --no-color
+            docker compose --project-directory pms-backend --env-file pms-backend/.env.local --env-file pms-backend/.env.compose -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed logs --no-color
           fi
       - name: Tear down full-stack integration
         if: always()
@@ -86,7 +86,7 @@ jobs:
           NEXTAUTH_SECRET: ci-nextauth-${{ github.run_id }}-at-least-32-characters
         run: |
           if [ -f pms-backend/.env.local ]; then
-            docker compose --project-directory pms-backend --env-file pms-backend/.env.local -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed down --volumes --remove-orphans
+            docker compose --project-directory pms-backend --env-file pms-backend/.env.local --env-file pms-backend/.env.compose -f pms-backend/compose.yaml -f pms-backend/compose.local.yaml -f compose.e2e.yaml --profile local-seed down --volumes --remove-orphans
           fi
       - name: Build immutable frontend image
         run: |
