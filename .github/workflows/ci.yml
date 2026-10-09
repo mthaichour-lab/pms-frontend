@@ -53,10 +53,21 @@ jobs:
         env:
           PMS_BACKEND_CONTEXT: ${{ github.workspace }}/pms-backend
         run: |
-          pnpm --dir pms-backend install --frozen-lockfile
-          pnpm --dir pms-backend run sdk:pack
-          pnpm run sdk:verify-provenance
-          pnpm run migration:verify-readiness
+          set +e
+          run_step() {
+            out=$("$@" 2>&1)
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::DIAG cmd[$*] rc=$rc out[$(printf '%s' "$out" | tail -c 1200 | tr '\n\r\t' '   ')]"
+              echo "::error::DIAG ls[$(ls -la pms-backend/*.tgz vendor/*.tgz 2>&1 | tr '\n' ' ')]"
+              echo "::error::DIAG sums[$(sha256sum pms-backend/bank-pms-api-client-1.0.0.tgz vendor/bank-pms-api-client-1.0.0.tgz pms-backend/contracts/openapi/pms-api.v1.json 2>&1 | tr '\n' ' ')]"
+              exit "$rc"
+            fi
+          }
+          run_step pnpm --dir pms-backend install --frozen-lockfile
+          run_step pnpm --dir pms-backend run sdk:pack
+          run_step pnpm run sdk:verify-provenance
+          run_step pnpm run migration:verify-readiness
       - name: Run authenticated frontend-to-backend integration
         env:
           PMS_FRONTEND_CONTEXT: ${{ github.workspace }}
