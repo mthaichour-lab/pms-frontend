@@ -225,6 +225,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       if (customerToken !== undefined && !/^tok_[A-Za-z0-9_-]{16,}$/.test(customerToken)) return problem(400, 'Invalid tokenized customer identifier', requestCorrelationId);
       return correlatedJson(await client.getTenorYieldCurve({ ...tracing, poolId, customerToken }), requestCorrelationId);
     }
+    if (path.length === 3 && path[0] === 'reporting' && path[1] === 'subscriber-yields') {
+      const poolId = path[2];
+      if (!/^[A-Za-z0-9._:-]{2,64}$/.test(poolId ?? '')) return problem(400, 'Invalid curve pool identifier', requestCorrelationId);
+      return correlatedJson(await client.getSubscriberYieldReport({ ...tracing, poolId }), requestCorrelationId);
+    }
+    if (path.length === 3 && path[0] === 'reporting' && path[1] === 'revenue-yields') {
+      const poolId = path[2], periodFrom = request.nextUrl.searchParams.get('periodFrom'), periodTo = request.nextUrl.searchParams.get('periodTo');
+      if (!/^[A-Za-z0-9._:-]{2,64}$/.test(poolId ?? '')) return problem(400, 'Invalid curve pool identifier', requestCorrelationId);
+      if (!isDate(periodFrom) || !isDate(periodTo) || periodFrom > periodTo) return problem(400, 'Valid periodFrom and periodTo are required', requestCorrelationId);
+      return correlatedJson(await client.getRevenueYieldReport({ ...tracing, poolId, periodFrom, periodTo }), requestCorrelationId);
+    }
     if (path.length === 3 && path[0] === 'risk' && path[1] === 'dashboard') {
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$/.test(path[2] ?? '')) return problem(400, 'Invalid risk dashboard pool identifier', requestCorrelationId);
       return correlatedJson(await client.getPublishedRiskDashboard({ ...tracing, poolId: path[2] }), requestCorrelationId);
@@ -704,7 +715,7 @@ function isPurificationPayment(value: unknown): value is { amount: string; evide
 function isRecognizedIncome(value: unknown): value is RecognizedIncome {
   if (!value || typeof value !== 'object') return false;
   const income = value as Record<string, unknown>;
-  return ['incomeId', 'assetId'].every((key) => typeof income[key] === 'string' && /^[0-9a-f-]{36}$/i.test(String(income[key]))) && ['sourceSystem', 'sourceReference', 'poolId', 'incomeType'].every((key) => typeof income[key] === 'string' && String(income[key]).trim().length > 0) && typeof income['businessDate'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(income['businessDate']) && typeof income['currency'] === 'string' && /^[A-Z]{3}$/.test(income['currency']) && isNonZeroDecimal(income['amount']) && ['ACCRUED', 'RECEIVED'].includes(String(income['cashStatus'])) && ['REALIZED', 'UNREALIZED'].includes(String(income['realizationStatus']));
+  return ['incomeId', 'assetId'].every((key) => typeof income[key] === 'string' && /^[0-9a-f-]{36}$/i.test(String(income[key]))) && ['sourceSystem', 'sourceReference', 'poolId', 'incomeType'].every((key) => typeof income[key] === 'string' && String(income[key]).trim().length > 0) && typeof income['glAccountCode'] === 'string' && /^[A-Z0-9a-f:_-]{2,128}$/.test(income['glAccountCode']) && typeof income['businessDate'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(income['businessDate']) && (income['maturityDate'] === undefined || isDate(income['maturityDate'])) && typeof income['currency'] === 'string' && /^[A-Z]{3}$/.test(income['currency']) && isNonZeroDecimal(income['amount']) && ['ACCRUED', 'RECEIVED'].includes(String(income['cashStatus'])) && ['REALIZED', 'UNREALIZED'].includes(String(income['realizationStatus']));
 }
 
 function isIncomeAdjustment(value: unknown): value is IncomeAdjustment {

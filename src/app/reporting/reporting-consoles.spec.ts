@@ -5,6 +5,8 @@ import { HistoricalForecastConsole } from './historical-forecast-console';
 import { PlanningScenarioConsole } from './planning-scenario-console';
 import { ReportingConsole } from './reporting-console';
 import { TenorCurveConsole } from './tenor-curve-console';
+import { SubscriberYieldConsole } from './subscriber-yield-console';
+import { RevenueYieldConsole } from './revenue-yield-console';
 
 describe('reporting form accessibility', () => {
   it('describes regulatory report and publication constraints', () => {
@@ -26,5 +28,14 @@ describe('reporting form accessibility', () => {
     expect(forecast).toContain('aria-describedby="historical-pool-hint"');
     expect(curve).toContain('aria-describedby="tenor-token-hint"');
     expect(curve).toContain('jamais un identifiant client en clair');
+  });
+
+  it('describes the subscriber and revenue yield-by-maturity reports', () => {
+    const subscriberYield = renderToStaticMarkup(createElement(SubscriberYieldConsole));
+    const revenueYield = renderToStaticMarkup(createElement(RevenueYieldConsole));
+    expect(subscriberYield).toContain('Taux de profit et de rendement par souscripteur');
+    expect(subscriberYield).toContain('aria-describedby="subscriber-yield-hint"');
+    expect(revenueYield).toContain('Taux de rendement et de profit des revenus par GL et par pool');
+    expect(revenueYield).toContain('dernier arrêté certifié du pool');
   });
 });
