@@ -51,7 +51,7 @@ packages:
     engines: {node: '>=6.9.0'}
 
   '@bank/pms-api-client@file:vendor/bank-pms-api-client-1.0.0.tgz':
-    resolution: {integrity: sha512-Kk1t4V+FMBce2yXlK4y/BjYQ/JVS9TpWbavCY8BUMTegT56NvN1BKKdjrec9VVOvo4jquyuzjoFpU6Mt/NZKSQ==, tarball: file:vendor/bank-pms-api-client-1.0.0.tgz}
+    resolution: {integrity: sha512-QS4CeDSRyYmBgfHF26UphWyyc+UjYW+tKKu/i9Ztb46BWCJcCPJXKQOzmYRKlhMC1AGy+NB1IL4iWtUhufC3PQ==, tarball: file:vendor/bank-pms-api-client-1.0.0.tgz}
     version: 1.0.0
 
   '@emnapi/runtime@1.11.3':

@@ -2,6 +2,7 @@ import type { GeneratedRegulatoryReport, RegulatoryReportGeneration, RegulatoryR
 import type { CreatePlanningScenario, PlanningScenarioTransition, PlanningScenarioTransitionCommand } from '@bank/pms-api-client';
 import type { HistoricalYieldForecast } from '@bank/pms-api-client';
 import type { TenorYieldCurve } from '@bank/pms-api-client';
+import type { SubscriberYieldReport, RevenueYieldReport } from '@bank/pms-api-client';
 export type { GeneratedRegulatoryReport, RegulatoryReportGeneration, RegulatoryReportPublication, RegulatoryReportTransition };
 export function generationFieldValidity(command: RegulatoryReportGeneration) {
   return {
@@ -62,4 +63,16 @@ export async function getTenorYieldCurve(poolId: string, customerToken?: string,
   const query = customerToken ? `?${new URLSearchParams({ customerToken })}` : '';
   const response = await fetch(`/api/core/reporting/tenor-curves/${encodeURIComponent(poolId)}${query}`, { signal });
   return responsePayload<TenorYieldCurve>(response);
+}
+
+export type { SubscriberYieldReport, RevenueYieldReport };
+export async function getSubscriberYieldReport(poolId: string, signal?: AbortSignal): Promise<SubscriberYieldReport> {
+  const response = await fetch(`/api/core/reporting/subscriber-yields/${encodeURIComponent(poolId)}`, { signal });
+  return responsePayload<SubscriberYieldReport>(response);
+}
+export const validReportingPeriod = (periodFrom: string, periodTo: string) => /^\d{4}-\d{2}-\d{2}$/.test(periodFrom) && /^\d{4}-\d{2}-\d{2}$/.test(periodTo) && periodFrom <= periodTo;
+export async function getRevenueYieldReport(poolId: string, periodFrom: string, periodTo: string, signal?: AbortSignal): Promise<RevenueYieldReport> {
+  const query = new URLSearchParams({ periodFrom, periodTo });
+  const response = await fetch(`/api/core/reporting/revenue-yields/${encodeURIComponent(poolId)}?${query}`, { signal });
+  return responsePayload<RevenueYieldReport>(response);
 }

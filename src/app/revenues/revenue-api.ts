@@ -16,7 +16,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 const stringField = (record: Record<string, unknown>, key: string): record is Record<string, string> => typeof record[key] === 'string';
 const isRecognizedIncome = (value: unknown): value is RecognizedIncome => isRecord(value) &&
-  ['incomeId', 'sourceSystem', 'sourceReference', 'assetId', 'poolId', 'businessDate', 'currency', 'amount', 'cashStatus', 'realizationStatus', 'incomeType'].every((key) => stringField(value, key));
+  ['incomeId', 'sourceSystem', 'sourceReference', 'assetId', 'poolId', 'glAccountCode', 'businessDate', 'currency', 'amount', 'cashStatus', 'realizationStatus', 'incomeType'].every((key) => stringField(value, key));
 const isIncomeAdjustment = (value: unknown): value is IncomeAdjustment => isRecord(value) &&
   ['adjustmentId', 'incomeId', 'amount', 'reason', 'approvalId', 'businessDate', 'actorId'].every((key) => stringField(value, key));
 const isPoolCharge = (value: unknown): value is PoolCharge => isRecord(value) &&
@@ -25,7 +25,8 @@ const isChargeEvaluation = (value: unknown): value is ChargeEvaluation => isReco
   value.accepted.every(isPoolCharge) && Array.isArray(value.rejected) && value.rejected.every((item) => isRecord(item) && isPoolCharge(item.charge) && typeof item.reason === 'string') &&
   typeof value.poolDeductibleTotal === 'string';
 
-export function validIncome(value: RecognizedIncome): boolean { return uuid.test(value.incomeId) && uuid.test(value.assetId) && [value.sourceSystem, value.sourceReference, value.poolId, value.incomeType].every((item) => item.trim().length > 0) && datePattern.test(value.businessDate) && /^[A-Z]{3}$/.test(value.currency) && decimalPattern.test(value.amount) && Number(value.amount) !== 0 && ['ACCRUED', 'RECEIVED'].includes(value.cashStatus) && ['REALIZED', 'UNREALIZED'].includes(value.realizationStatus); }
+const glAccountCodePattern = /^[A-Z0-9a-f:_-]{2,128}$/;
+export function validIncome(value: RecognizedIncome): boolean { return uuid.test(value.incomeId) && uuid.test(value.assetId) && [value.sourceSystem, value.sourceReference, value.poolId, value.incomeType].every((item) => item.trim().length > 0) && glAccountCodePattern.test(value.glAccountCode) && datePattern.test(value.businessDate) && (value.maturityDate === undefined || datePattern.test(value.maturityDate)) && /^[A-Z]{3}$/.test(value.currency) && decimalPattern.test(value.amount) && Number(value.amount) !== 0 && ['ACCRUED', 'RECEIVED'].includes(value.cashStatus) && ['REALIZED', 'UNREALIZED'].includes(value.realizationStatus); }
 export function validAdjustment(value: IncomeAdjustment): boolean { return uuid.test(value.adjustmentId) && uuid.test(value.incomeId) && decimalPattern.test(value.amount) && Number(value.amount) !== 0 && value.reason.trim().length >= 10 && value.approvalId.trim().length >= 16 && value.actorId.trim().length > 0 && datePattern.test(value.businessDate); }
 function optionsOf(options?: RevenueRequestOptions | AbortSignal): RevenueRequestOptions { return options && 'aborted' in options ? { signal: options } : options ?? {}; }
 async function request<T>(path: string, body: unknown | undefined, validate: (value: unknown) => value is T, options?: RevenueRequestOptions | AbortSignal): Promise<T> {
