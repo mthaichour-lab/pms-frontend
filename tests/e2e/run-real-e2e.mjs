@@ -30,6 +30,7 @@ const composeArguments = [
   "--project-name", composeProject,
   "--project-directory", backendRoot,
   "--env-file", resolve(backendRoot, ".env.local"),
+  "--env-file", resolve(backendRoot, ".env.compose"),
   "-f", resolve(backendRoot, "compose.yaml"),
   "-f", resolve(backendRoot, "compose.local.yaml"),
   "-f", resolve(projectRoot, "compose.e2e.yaml"),
